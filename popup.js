@@ -449,14 +449,30 @@ async function renderAccounts() {
    Event Delegation for Copy & Delete actions
    ================================================================ */
 $accounts.addEventListener("click", async (e) => {
-  const copyBtn = e.target.closest("[data-copy]");
-  if (copyBtn) {
+  const deleteBtn = e.target.closest("[data-delete]");
+  if (deleteBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const card = deleteBtn.closest(".card");
+    const id = card.dataset.id;
+    card.classList.add("card--removing");
+    card.addEventListener("animationend", async () => {
+      await removeAccount(id);
+      await renderAccounts();
+      showToast("Аккаунт удален");
+    }, { once: true });
+    return;
+  }
+
+  // Click on card or any of its child copy triggers (like the copy button or code text)
+  const card = e.target.closest(".card");
+  if (card) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (copyBtn.disabled) return;
+    const copyBtn = card.querySelector("[data-copy]");
+    if (copyBtn && copyBtn.disabled) return;
 
-    const card = copyBtn.closest(".card");
     const codeEl = card.querySelector("[data-code]");
     const raw = codeEl.textContent.replace(/\s/g, "");
 
@@ -471,22 +487,6 @@ $accounts.addEventListener("click", async (e) => {
     } else {
       showToast("Ошибка копирования", "error");
     }
-    return;
-  }
-
-  const deleteBtn = e.target.closest("[data-delete]");
-  if (deleteBtn) {
-    e.preventDefault();
-    e.stopPropagation();
-    const card = deleteBtn.closest(".card");
-    const id = card.dataset.id;
-    card.classList.add("card--removing");
-    card.addEventListener("animationend", async () => {
-      await removeAccount(id);
-      await renderAccounts();
-      showToast("Аккаунт удален");
-    }, { once: true });
-    return;
   }
 });
 
