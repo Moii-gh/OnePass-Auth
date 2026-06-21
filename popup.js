@@ -400,10 +400,13 @@ async function renderAccounts() {
     card.dataset.id = acc.id;
     card.dataset.period = period;
 
-    const initial = acc.service.charAt(0);
+    const initial = acc.service ? acc.service.charAt(0) : "?";
+    const domain = getDomainForService(acc.service);
 
     card.innerHTML = `
-      <div class="card__avatar">${escapeHtml(initial)}</div>
+      <div class="card__avatar">
+        <span class="card__avatar-fallback">${escapeHtml(initial)}</span>
+      </div>
       <div class="card__info">
         <div class="card__service">${escapeHtml(acc.service)}</div>
         <div class="card__login">${escapeHtml(acc.login)}</div>
@@ -440,6 +443,27 @@ async function renderAccounts() {
         </div>
       </div>
     `;
+
+    if (domain) {
+      const img = document.createElement("img");
+      img.className = "card__avatar-img";
+      img.style.display = "none";
+
+      const avatarContainer = card.querySelector(".card__avatar");
+      const fallbackEl = avatarContainer.querySelector(".card__avatar-fallback");
+
+      img.onload = () => {
+        img.style.display = "block";
+        fallbackEl.style.display = "none";
+      };
+      img.onerror = () => {
+        img.style.display = "none";
+        fallbackEl.style.display = "block";
+      };
+
+      img.src = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+      avatarContainer.prepend(img);
+    }
 
     $accounts.appendChild(card);
   }
@@ -542,6 +566,90 @@ function formatCode(code) {
     return code.slice(0, 4) + " " + code.slice(4);
   }
   return code;
+}
+
+function getDomainForService(serviceName) {
+  if (!serviceName) return "";
+  
+  const trimmed = serviceName.trim().toLowerCase();
+  
+  // If it already looks like a domain
+  if (trimmed.includes(".") && trimmed.length > 3 && !trimmed.startsWith(".") && !trimmed.endsWith(".")) {
+    return trimmed;
+  }
+  
+  // Clean to alphanumeric
+  const cleanKey = trimmed.replace(/[^a-z0-9]/g, "");
+  
+  const serviceDomains = {
+    github: "github.com",
+    google: "google.com",
+    facebook: "facebook.com",
+    twitter: "twitter.com",
+    x: "x.com",
+    microsoft: "microsoft.com",
+    gitlab: "gitlab.com",
+    bitbucket: "bitbucket.com",
+    aws: "amazon.com",
+    amazon: "amazon.com",
+    discord: "discord.com",
+    slack: "slack.com",
+    telegram: "telegram.org",
+    steam: "steampowered.com",
+    vk: "vk.com",
+    vkontakte: "vk.com",
+    yandex: "yandex.ru",
+    mailru: "mail.ru",
+    binance: "binance.com",
+    coinbase: "coinbase.com",
+    kraken: "kraken.com",
+    proton: "proton.me",
+    protonmail: "proton.me",
+    zoho: "zoho.com",
+    dropbox: "dropbox.com",
+    evernote: "evernote.com",
+    nextcloud: "nextcloud.com",
+    bitwarden: "bitwarden.com",
+    "1password": "1password.com",
+    dashlane: "dashlane.com",
+    lastpass: "lastpass.com",
+    adobe: "adobe.com",
+    apple: "apple.com",
+    cloudflare: "cloudflare.com",
+    digitalocean: "digitalocean.com",
+    heroku: "heroku.com",
+    reddit: "reddit.com",
+    spotify: "spotify.com",
+    twitch: "twitch.tv",
+    zoom: "zoom.us",
+    epicgames: "epicgames.com",
+    ea: "ea.com",
+    ubisoft: "ubisoft.com",
+    nintendo: "nintendo.com",
+    playstation: "playstation.com",
+    xbox: "xbox.com",
+    figma: "figma.com",
+    notion: "notion.so",
+    trello: "trello.com",
+    asana: "asana.com",
+    jira: "atlassian.com",
+    atlassian: "atlassian.com",
+    stripe: "stripe.com",
+    paypal: "paypal.com",
+    shopify: "shopify.com",
+    patreon: "patreon.com",
+    kickstarter: "kickstarter.com"
+  };
+  
+  if (serviceDomains[cleanKey]) {
+    return serviceDomains[cleanKey];
+  }
+  
+  if (cleanKey.length > 0) {
+    return cleanKey + ".com";
+  }
+  
+  return "";
 }
 
 /* ================================================================

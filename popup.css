@@ -31,8 +31,8 @@
 
   /* misc */
   --border:         rgba(255,255,255,.06);
-  --radius:         16px;
-  --radius-sm:      10px;
+  --radius:         24px;
+  --radius-sm:      14px;
   --shadow-card:    0 4px 16px rgba(0,0,0,.35);
 
   /* timer ring */
@@ -97,7 +97,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 50%;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
@@ -144,13 +144,13 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 
 .add-form__input {
   height: 44px;
-  padding: 0 16px;
+  padding: 0 20px;
   font-family: inherit;
   font-size: 14px;
   color: var(--text-primary);
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 22px;
   outline: none;
   transition: border-color .2s, box-shadow .2s;
 }
@@ -173,7 +173,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   color: #fff;
   background: var(--accent);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 22px;
   cursor: pointer;
   transition: background .2s, transform .1s;
 }
@@ -209,7 +209,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   font-size: 13px;
   font-weight: 600;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 21px;
   cursor: pointer;
   transition: all .2s, transform .1s;
 }
@@ -325,7 +325,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   font-size: 12px;
   font-weight: 600;
   border: none;
-  border-radius: 6px;
+  border-radius: 16px;
   cursor: pointer;
   transition: all .2s;
 }
@@ -397,20 +397,30 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   border-color: rgba(255,255,255,.09);
 }
 
-/* service avatar */
 .card__avatar {
   flex-shrink: 0;
   width: 44px;
   height: 44px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 50%;
   font-size: 18px;
   font-weight: 700;
   color: var(--accent);
   background: var(--accent-glow);
   text-transform: uppercase;
   user-select: none;
+  overflow: hidden;
+}
+.card__avatar-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 4px;
+  user-select: none;
+}
+.card__avatar-fallback {
+  display: block;
 }
 
 /* info block */
@@ -506,7 +516,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   display: grid;
   place-items: center;
   border: none;
-  border-radius: 6px;
+  border-radius: 50%;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
