@@ -168,7 +168,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: #000000;
   background: var(--accent);
   border: none;
   border-radius: 22px;
@@ -221,7 +221,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 
 .qr-panel__btn-action--primary {
   background: var(--accent);
-  color: #fff;
+  color: #000000;
 }
 .qr-panel__btn-action--primary:hover {
   background: var(--accent-hover);
