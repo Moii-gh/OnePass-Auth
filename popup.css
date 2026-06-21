@@ -390,6 +390,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
   cursor: pointer;
+  user-select: none;
   transition: background .2s, border-color .2s;
 }
 .card:hover {
@@ -397,67 +398,51 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   border-color: rgba(255,255,255,.09);
 }
 
-.card__avatar {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--accent-glow);
-  text-transform: uppercase;
-  user-select: none;
-  overflow: hidden;
-}
-.card__avatar-img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-  border-radius: 4px;
-  user-select: none;
-}
-.card__avatar-fallback {
-  display: block;
-}
-
 /* info block */
 .card__info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
 }
 .card__service {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+.card__separator {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+  user-select: none;
 }
 .card__login {
   font-size: 12px;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 3px;
 }
 
 /* code */
 .card__code {
   font-family: 'JetBrains Mono', 'Consolas', monospace;
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 700;
   letter-spacing: 4px;
-  color: var(--text-primary);
-  user-select: all;
+  color: var(--accent);
+  user-select: none;
   flex-shrink: 0;
-  transition: color .2s;
+  transition: color .2s, transform .2s;
+  align-self: flex-start;
 }
 .card__code:hover {
-  color: var(--accent);
+  color: var(--accent-hover);
   cursor: pointer;
 }
 
@@ -578,4 +563,56 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 .card--removing {
   animation: fadeOutLeft .3s ease forwards;
+}
+
+/* ---------- Custom Context Menu ---------- */
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  min-width: 170px;
+  animation: contextMenuFadeIn .15s ease-out;
+}
+.context-menu--hidden { display: none; }
+
+@keyframes contextMenuFadeIn {
+  from { opacity: 0; transform: scale(.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background .2s, color .2s;
+}
+.context-menu__item:hover {
+  background: rgba(255, 255, 255, .04);
+  color: var(--accent-hover);
+}
+.context-menu__item--danger:hover {
+  background: var(--red-bg);
+  color: var(--red);
+}
+.context-menu__icon {
+  width: 15px;
+  height: 15px;
+  color: inherit;
 }

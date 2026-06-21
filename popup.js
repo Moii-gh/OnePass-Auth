@@ -37,6 +37,12 @@ const $qrPreviewList = document.getElementById("qr-preview-list");
 const $btnQrConfirm = document.getElementById("btn-qr-confirm");
 const $btnQrCancel  = document.getElementById("btn-qr-cancel");
 
+// Context menu references
+const $contextMenu = document.getElementById("context-menu");
+const $ctxCopy     = document.getElementById("ctx-copy");
+const $ctxDelete   = document.getElementById("ctx-delete");
+let activeCardId   = null;
+
 /* ================================================================
    Toast
    ================================================================ */
@@ -400,18 +406,15 @@ async function renderAccounts() {
     card.dataset.id = acc.id;
     card.dataset.period = period;
 
-    const initial = acc.service ? acc.service.charAt(0) : "?";
-    const domain = getDomainForService(acc.service);
-
     card.innerHTML = `
-      <div class="card__avatar">
-        <span class="card__avatar-fallback">${escapeHtml(initial)}</span>
-      </div>
       <div class="card__info">
-        <div class="card__service">${escapeHtml(acc.service)}</div>
-        <div class="card__login">${escapeHtml(acc.login)}</div>
+        <div class="card__meta">
+          <span class="card__service">${escapeHtml(acc.service)}</span>
+          <span class="card__separator">:</span>
+          <span class="card__login">${escapeHtml(acc.login)}</span>
+        </div>
+        <div class="card__code" data-code>${escapeHtml(code)}</div>
       </div>
-      <div class="card__code" data-code>${escapeHtml(code)}</div>
       <div class="card__right">
         <div class="card__timer">
           <svg viewBox="0 0 36 36">
@@ -424,46 +427,8 @@ async function renderAccounts() {
           </svg>
           <span class="card__timer-text" data-timer-text>${secs}</span>
         </div>
-        <div class="card__actions">
-          <button class="card__btn card__btn--copy" title="Copy code" data-copy ${isError ? 'disabled' : ''}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-          </button>
-          <button class="card__btn card__btn--delete" title="Delete account" data-delete>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-              <path d="M10 11v6"/>
-              <path d="M14 11v6"/>
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-            </svg>
-          </button>
-        </div>
       </div>
     `;
-
-    if (domain) {
-      const img = document.createElement("img");
-      img.className = "card__avatar-img";
-      img.style.display = "none";
-
-      const avatarContainer = card.querySelector(".card__avatar");
-      const fallbackEl = avatarContainer.querySelector(".card__avatar-fallback");
-
-      img.onload = () => {
-        img.style.display = "block";
-        fallbackEl.style.display = "none";
-      };
-      img.onerror = () => {
-        img.style.display = "none";
-        fallbackEl.style.display = "block";
-      };
-
-      img.src = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
-      avatarContainer.prepend(img);
-    }
 
     $accounts.appendChild(card);
   }
@@ -473,29 +438,11 @@ async function renderAccounts() {
    Event Delegation for Copy & Delete actions
    ================================================================ */
 $accounts.addEventListener("click", async (e) => {
-  const deleteBtn = e.target.closest("[data-delete]");
-  if (deleteBtn) {
-    e.preventDefault();
-    e.stopPropagation();
-    const card = deleteBtn.closest(".card");
-    const id = card.dataset.id;
-    card.classList.add("card--removing");
-    card.addEventListener("animationend", async () => {
-      await removeAccount(id);
-      await renderAccounts();
-      showToast("Аккаунт удален");
-    }, { once: true });
-    return;
-  }
-
-  // Click on card or any of its child copy triggers (like the copy button or code text)
+  // Left click on card or code to copy the TOTP token
   const card = e.target.closest(".card");
   if (card) {
     e.preventDefault();
     e.stopPropagation();
-
-    const copyBtn = card.querySelector("[data-copy]");
-    if (copyBtn && copyBtn.disabled) return;
 
     const codeEl = card.querySelector("[data-code]");
     const raw = codeEl.textContent.replace(/\s/g, "");
@@ -512,6 +459,84 @@ $accounts.addEventListener("click", async (e) => {
       showToast("Ошибка копирования", "error");
     }
   }
+});
+
+// Custom Right-Click Context Menu triggers
+$accounts.addEventListener("contextmenu", (e) => {
+  const card = e.target.closest(".card");
+  if (card) {
+    e.preventDefault();
+    e.stopPropagation();
+    activeCardId = card.dataset.id;
+
+    // Show and position the context menu
+    $contextMenu.classList.remove("context-menu--hidden");
+
+    const menuWidth = 170;
+    const menuHeight = 90;
+    let x = e.clientX;
+    let y = e.clientY;
+
+    // Boundary check so context menu doesn't overflow popup
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 10;
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 10;
+    }
+
+    $contextMenu.style.left = `${x}px`;
+    $contextMenu.style.top = `${y}px`;
+  }
+});
+
+// Close context menu when clicking anywhere else
+document.addEventListener("click", () => {
+  $contextMenu.classList.add("context-menu--hidden");
+});
+
+// Handle Context Menu Actions
+$ctxCopy.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!activeCardId) return;
+
+  const card = document.querySelector(`.card[data-id="${activeCardId}"]`);
+  if (card) {
+    const codeEl = card.querySelector("[data-code]");
+    const raw = codeEl.textContent.replace(/\s/g, "");
+
+    if (raw === "ERROR") {
+      showToast("Ошибка генерации кода", "error");
+      return;
+    }
+
+    const success = await copyToClipboard(raw);
+    if (success) {
+      showToast("Код скопирован!");
+    } else {
+      showToast("Ошибка копирования", "error");
+    }
+  }
+  $contextMenu.classList.add("context-menu--hidden");
+});
+
+$ctxDelete.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!activeCardId) return;
+
+  const card = document.querySelector(`.card[data-id="${activeCardId}"]`);
+  if (card) {
+    const id = activeCardId;
+    card.classList.add("card--removing");
+    card.addEventListener("animationend", async () => {
+      await removeAccount(id);
+      await renderAccounts();
+      showToast("Аккаунт удален");
+    }, { once: true });
+  }
+  $contextMenu.classList.add("context-menu--hidden");
 });
 
 /* ================================================================
@@ -568,89 +593,6 @@ function formatCode(code) {
   return code;
 }
 
-function getDomainForService(serviceName) {
-  if (!serviceName) return "";
-  
-  const trimmed = serviceName.trim().toLowerCase();
-  
-  // If it already looks like a domain
-  if (trimmed.includes(".") && trimmed.length > 3 && !trimmed.startsWith(".") && !trimmed.endsWith(".")) {
-    return trimmed;
-  }
-  
-  // Clean to alphanumeric
-  const cleanKey = trimmed.replace(/[^a-z0-9]/g, "");
-  
-  const serviceDomains = {
-    github: "github.com",
-    google: "google.com",
-    facebook: "facebook.com",
-    twitter: "twitter.com",
-    x: "x.com",
-    microsoft: "microsoft.com",
-    gitlab: "gitlab.com",
-    bitbucket: "bitbucket.com",
-    aws: "amazon.com",
-    amazon: "amazon.com",
-    discord: "discord.com",
-    slack: "slack.com",
-    telegram: "telegram.org",
-    steam: "steampowered.com",
-    vk: "vk.com",
-    vkontakte: "vk.com",
-    yandex: "yandex.ru",
-    mailru: "mail.ru",
-    binance: "binance.com",
-    coinbase: "coinbase.com",
-    kraken: "kraken.com",
-    proton: "proton.me",
-    protonmail: "proton.me",
-    zoho: "zoho.com",
-    dropbox: "dropbox.com",
-    evernote: "evernote.com",
-    nextcloud: "nextcloud.com",
-    bitwarden: "bitwarden.com",
-    "1password": "1password.com",
-    dashlane: "dashlane.com",
-    lastpass: "lastpass.com",
-    adobe: "adobe.com",
-    apple: "apple.com",
-    cloudflare: "cloudflare.com",
-    digitalocean: "digitalocean.com",
-    heroku: "heroku.com",
-    reddit: "reddit.com",
-    spotify: "spotify.com",
-    twitch: "twitch.tv",
-    zoom: "zoom.us",
-    epicgames: "epicgames.com",
-    ea: "ea.com",
-    ubisoft: "ubisoft.com",
-    nintendo: "nintendo.com",
-    playstation: "playstation.com",
-    xbox: "xbox.com",
-    figma: "figma.com",
-    notion: "notion.so",
-    trello: "trello.com",
-    asana: "asana.com",
-    jira: "atlassian.com",
-    atlassian: "atlassian.com",
-    stripe: "stripe.com",
-    paypal: "paypal.com",
-    shopify: "shopify.com",
-    patreon: "patreon.com",
-    kickstarter: "kickstarter.com"
-  };
-  
-  if (serviceDomains[cleanKey]) {
-    return serviceDomains[cleanKey];
-  }
-  
-  if (cleanKey.length > 0) {
-    return cleanKey + ".com";
-  }
-  
-  return "";
-}
 
 /* ================================================================
    Boot
