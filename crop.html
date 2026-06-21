@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>OnePass Auth – Выбор области сканирования</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+    
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #screenshot-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: block;
+    }
+
+    /* UI Overlay elements */
+    .header-bar {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 30px;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      pointer-events: auto;
+    }
+
+    .header-bar__text {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+    }
+
+    .header-bar__btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #ffffff;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 15px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .header-bar__btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Message Toast */
+    .toast {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #f05c5c;
+      color: #ffffff;
+      padding: 12px 24px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 10;
+      box-shadow: 0 4px 16px rgba(240, 92, 92, 0.35);
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+    }
+
+    .toast--visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-10px);
+    }
+
+    .toast--success {
+      background: #3ecf8e;
+      box-shadow: 0 4px 16px rgba(62, 207, 142, 0.35);
+    }
+
+    /* Instructions overlay */
+    #instruction-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 5;
+      color: white;
+      text-align: center;
+      transition: opacity 0.5s;
+    }
+
+    #instruction-overlay h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    #instruction-overlay p {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 24px;
+    }
+
+    #instruction-overlay button {
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 25px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="screenshot-canvas"></canvas>
+
+    <div class="header-bar">
+      <span class="header-bar__text">Выделите рамкой область с QR-кодом</span>
+      <button id="btn-cancel" class="header-bar__btn">Отмена</button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <div id="instruction-overlay">
+      <h1>OnePass Auth – Сканирование QR</h1>
+      <p>Зажмите левую кнопку мыши и выделите прямоугольником QR-код на экране</p>
+      <button id="btn-start">Начать выделение</button>
+    </div>
+  </div>
+
+  <!-- Library Scripts -->
+  <script src="crypto.js"></script>
+  <script src="totp.js"></script>
+  <script src="storage.js"></script>
+  <script src="jsQR.js"></script>
+  <script src="qr.js"></script>
+  <script src="crop.js"></script>
+</body>
+</html>

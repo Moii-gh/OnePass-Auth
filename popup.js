@@ -264,34 +264,14 @@ $btnQrScreen.addEventListener("click", async () => {
           return;
         }
 
-        const img = new Image();
-        img.onload = async function () {
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0);
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-            if (!code) {
-              showToast("QR-код не найден на экране. Сделайте его крупнее на странице.", "error");
-              return;
-            }
-
-            const accountList = parseOtpauthUrl(code.data);
-            handleRecognizedAccounts(accountList);
-          } catch (err) {
-            console.error(err);
-            showToast(err.message || "Ошибка распознавания с экрана", "error");
-          }
-        };
-        img.onerror = function () {
-          showToast("Ошибка обработки скриншота", "error");
-        };
-        img.src = dataUrl;
+        // Save screenshot to local storage
+        chrome.storage.local.set({ tempScreenshot: dataUrl }, () => {
+          // Open the crop tab
+          chrome.tabs.create({ url: "crop.html" }, () => {
+            // Close the popup so the user can interact with the crop tab
+            window.close();
+          });
+        });
       });
     });
   } catch (err) {
