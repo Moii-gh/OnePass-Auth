@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Authenticator",
+  "name": "OnePass Auth",
   "version": "1.0.0",
   "description": "TOTP authenticator – generate 6-digit codes (RFC 6238)",
   "icons": {
