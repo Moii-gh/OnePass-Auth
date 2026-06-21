@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=380" />
+  <title>Authenticator</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <!-- ───────── Header ───────── -->
+  <header class="header">
+    <div class="header__brand">
+      <svg class="header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <h1 class="header__title">Authenticator</h1>
+    </div>
+    <div class="header__actions">
+      <button id="btn-toggle-qr" class="header__btn" title="Import from QR">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <rect x="7" y="7" width="3" height="3"/>
+          <rect x="14" y="7" width="3" height="3"/>
+          <rect x="7" y="14" width="3" height="3"/>
+          <line x1="14" y1="14" x2="14" y2="14.01"/>
+          <line x1="17" y1="14" x2="17" y2="14.01"/>
+          <line x1="14" y1="17" x2="17" y2="17"/>
+        </svg>
+      </button>
+      <button id="btn-toggle-form" class="header__btn" title="Add account manually">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ───────── Add-account form (Manual) ───────── -->
+  <section id="add-form" class="add-form add-form--hidden">
+    <div class="form-title">Manual Import</div>
+    <input id="input-service" type="text" class="add-form__input" placeholder="Service name (e.g. Google)" autocomplete="off" />
+    <input id="input-login"   type="text" class="add-form__input" placeholder="Login / email" autocomplete="off" />
+    <input id="input-secret"  type="text" class="add-form__input" placeholder="Secret key (Base32)" autocomplete="off" spellcheck="false" />
+    <button id="btn-save" class="add-form__save">Add account</button>
+  </section>
+
+  <!-- ───────── QR import panel ───────── -->
+  <section id="qr-panel" class="qr-panel qr-panel--hidden">
+    <div class="form-title">Import QR-code</div>
+    
+    <div class="qr-panel__quick-actions">
+      <button id="btn-qr-screen" class="qr-panel__btn-action qr-panel__btn-action--primary" title="Scan QR directly from current page/tab screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <rect x="7" y="7" width="3" height="3"/>
+          <rect x="14" y="7" width="3" height="3"/>
+          <rect x="7" y="14" width="3" height="3"/>
+          <line x1="14" y1="14" x2="14" y2="14.01"/>
+          <line x1="17" y1="14" x2="17" y2="14.01"/>
+          <line x1="14" y1="17" x2="17" y2="17"/>
+        </svg>
+        Scan Screen
+      </button>
+      <button id="btn-qr-paste" class="qr-panel__btn-action qr-panel__btn-action--secondary" title="Paste QR image from clipboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+        </svg>
+        Paste Image
+      </button>
+    </div>
+
+    <div class="qr-panel__dropzone" id="qr-dropzone">
+      <svg class="qr-panel__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p class="qr-panel__text">Or choose QR image file</p>
+      <p class="qr-panel__subtext">(PNG, JPG, WebP)</p>
+      <input type="file" id="input-qr-file" accept="image/*" class="qr-panel__file-input" />
+    </div>
+
+    <!-- Confirm QR content view inside panel -->
+    <div id="qr-preview" class="qr-preview qr-preview--hidden">
+      <div class="qr-preview__label" id="qr-preview-title">Recognized Account Info:</div>
+      <div id="qr-preview-list" class="qr-preview__list" style="max-height: 140px; overflow-y: auto; margin-top: 6px; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+        <!-- preview items generated dynamically -->
+      </div>
+      <div class="qr-preview__actions">
+        <button id="btn-qr-confirm" class="qr-preview__btn qr-preview__btn--confirm">Confirm & Save</button>
+        <button id="btn-qr-cancel" class="qr-preview__btn qr-preview__btn--cancel">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Toast ───────── -->
+  <div id="toast" class="toast"></div>
+
+  <!-- ───────── Account list ───────── -->
+  <section id="accounts" class="accounts">
+    <!-- cards rendered by popup.js -->
+  </section>
+
+  <!-- ───────── Empty state ───────── -->
+  <section id="empty-state" class="empty-state">
+    <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+    <p class="empty-state__text">No accounts yet</p>
+    <p class="empty-state__hint">Add manually or import via QR-code above</p>
+  </section>
+
+  <!-- Scripts (order matters: crypto → totp → storage → jsQR → qr → popup) -->
+  <script src="crypto.js"></script>
+  <script src="totp.js"></script>
+  <script src="storage.js"></script>
+  <script src="jsQR.js"></script>
+  <script src="qr.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
