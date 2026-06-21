@@ -246,45 +246,53 @@ $qrFileInput.addEventListener("change", async (e) => {
 $btnQrScreen.addEventListener("click", async () => {
   try {
     showToast("Делаем скриншот вкладки...", "success");
-    chrome.tabs.captureVisibleTab(null, { format: "png" }, async (dataUrl) => {
-      if (chrome.runtime.lastError) {
-        showToast("Откройте обычный сайт (не chrome://) и разрешите доступ", "error");
-        console.error(chrome.runtime.lastError.message);
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs[0];
+      if (!activeTab) {
+        showToast("Не найдена активная вкладка", "error");
         return;
       }
-      if (!dataUrl) {
-        showToast("Скриншот пуст", "error");
-        return;
-      }
-
-      const img = new Image();
-      img.onload = async function () {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0);
-
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-          if (!code) {
-            showToast("QR-код не найден на экране. Сделайте его крупнее на странице.", "error");
-            return;
-          }
-
-          const accountList = parseOtpauthUrl(code.data);
-          handleRecognizedAccounts(accountList);
-        } catch (err) {
-          console.error(err);
-          showToast(err.message || "Ошибка распознавания с экрана", "error");
+      chrome.tabs.captureVisibleTab(activeTab.windowId, { format: "png" }, async (dataUrl) => {
+        if (chrome.runtime.lastError) {
+          const errMsg = chrome.runtime.lastError.message || "";
+          console.error("Capture error:", errMsg);
+          showToast("Ошибка: " + errMsg, "error");
+          return;
         }
-      };
-      img.onerror = function () {
-        showToast("Ошибка обработки скриншота", "error");
-      };
-      img.src = dataUrl;
+        if (!dataUrl) {
+          showToast("Скриншот пуст", "error");
+          return;
+        }
+
+        const img = new Image();
+        img.onload = async function () {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (!code) {
+              showToast("QR-код не найден на экране. Сделайте его крупнее на странице.", "error");
+              return;
+            }
+
+            const accountList = parseOtpauthUrl(code.data);
+            handleRecognizedAccounts(accountList);
+          } catch (err) {
+            console.error(err);
+            showToast(err.message || "Ошибка распознавания с экрана", "error");
+          }
+        };
+        img.onerror = function () {
+          showToast("Ошибка обработки скриншота", "error");
+        };
+        img.src = dataUrl;
+      });
     });
   } catch (err) {
     console.error(err);
