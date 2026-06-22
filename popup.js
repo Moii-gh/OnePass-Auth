@@ -9,7 +9,8 @@ import {
   generateTOTP, generateHOTP, secondsRemaining 
 } from './totp.js';
 import { 
-  loadAccounts, addAccount, updateAccount, incrementCounter, removeAccount 
+  loadAccounts, addAccount, updateAccount, incrementCounter, removeAccount,
+  loadCustomCategories, addCustomCategory, removeCustomCategory
 } from './storage.js';
 import { 
   parseOtpauthUrl 
@@ -91,9 +92,19 @@ const $inputBackupFile = document.getElementById("input-backup-file");
 const $inputSearch    = document.getElementById("input-search");
 const $btnSearchClear = document.getElementById("btn-search-clear");
 
-// Categories chips
-const $categoryChips = document.querySelectorAll(".category-chip");
+// Categories chips & manager references
+const $categoriesWrapper = document.getElementById("categories-wrapper");
+const $settingsCategoriesList = document.getElementById("settings-categories-list");
+
+// Inline category creator references
+const $newCatInlineContainer = document.getElementById("add-form-new-cat-container");
+const $inputNewCatInline = document.getElementById("input-new-cat-inline");
+const $btnSaveNewCatInline = document.getElementById("btn-save-new-cat-inline");
+const $btnCancelNewCatInline = document.getElementById("btn-cancel-new-cat-inline");
+
 let currentCategory = "all";
+
+const DEFAULT_CATEGORIES = ["personal", "work", "finance", "social", "other"];
 
 // Lock screen overlays
 const $lockScreen = document.getElementById("lock-screen");
@@ -180,6 +191,9 @@ function closeAllPanels() {
   $btnSave.textContent = getTranslation("btn_add_account");
   editingId = null;
 
+  if ($newCatInlineContainer) {
+    $newCatInlineContainer.style.display = "none";
+  }
   resetQrPreview();
 }
 
@@ -501,7 +515,10 @@ async function renderAccounts() {
     // Category indicator class if category exists
     let catTagHtml = "";
     if (category !== "none") {
-      catTagHtml = `<span class="category-chip category-chip--indicator" style="padding: 2px 6px; font-size: 9px; cursor: default; margin-left: 6px; background-color: var(--accent-glow); color: var(--accent); border-color: var(--accent); border-radius: 8px;">${category}</span>`;
+      const displayCatName = DEFAULT_CATEGORIES.includes(category) 
+        ? getTranslation(`category_${category}`) 
+        : category;
+      catTagHtml = `<span class="category-chip category-chip--indicator" style="padding: 2px 6px; font-size: 9px; cursor: default; margin-left: 6px; background-color: var(--accent-glow); color: var(--accent); border-color: var(--accent); border-radius: 8px;">${escapeHtml(displayCatName)}</span>`;
     }
 
     card.innerHTML = `
@@ -916,15 +933,187 @@ $accounts.addEventListener("mouseleave", (e) => {
 }, true);
 
 /* ================================================================
-   Categories Chips Filtering
+   Categories Chips Filtering & Manager UI Logic
    ================================================================ */
-$categoryChips.forEach(chip => {
-  chip.addEventListener("click", () => {
-    $categoryChips.forEach(c => c.classList.remove("category-chip--active"));
+async function renderCategoriesUI() {
+  const customCats = await loadCustomCategories();
+  const allCats = [...DEFAULT_CATEGORIES, ...customCats];
+
+  // 1. Render chips
+  const activeCategoryBefore = currentCategory;
+  $categoriesWrapper.innerHTML = "";
+  
+  const btnAll = document.createElement("button");
+  btnAll.className = `category-chip ${activeCategoryBefore === 'all' ? 'category-chip--active' : ''}`;
+  btnAll.dataset.category = "all";
+  btnAll.textContent = getTranslation("category_all");
+  $categoriesWrapper.appendChild(btnAll);
+
+  allCats.forEach(cat => {
+    const btn = document.createElement("button");
+    btn.className = `category-chip ${activeCategoryBefore === cat ? 'category-chip--active' : ''}`;
+    btn.dataset.category = cat;
+    if (DEFAULT_CATEGORIES.includes(cat)) {
+      btn.textContent = getTranslation(`category_${cat}`);
+    } else {
+      btn.textContent = cat;
+    }
+    $categoriesWrapper.appendChild(btn);
+  });
+
+  // 2. Render select options inside manual add-form
+  const selectedValBefore = $selectCategory.value || "none";
+  $selectCategory.innerHTML = "";
+  
+  const optNone = document.createElement("option");
+  optNone.value = "none";
+  optNone.textContent = getTranslation("category_none");
+  $selectCategory.appendChild(optNone);
+
+  allCats.forEach(cat => {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    if (DEFAULT_CATEGORIES.includes(cat)) {
+      opt.textContent = getTranslation(`category_${cat}`);
+    } else {
+      opt.textContent = cat;
+    }
+    $selectCategory.appendChild(opt);
+  });
+
+  // Always append '+ Create new category...' at the end of the select list
+  const optCreate = document.createElement("option");
+  optCreate.value = "__create_new__";
+  optCreate.textContent = getTranslation("category_create_new");
+  optCreate.style.fontWeight = "bold";
+  optCreate.style.color = "var(--accent)";
+  $selectCategory.appendChild(optCreate);
+
+  $selectCategory.value = selectedValBefore;
+
+  // 3. Render list in Settings Manager
+  $settingsCategoriesList.innerHTML = "";
+  if (customCats.length === 0) {
+    const emptyMsg = document.createElement("div");
+    emptyMsg.style.fontSize = "12px";
+    emptyMsg.style.color = "var(--text-muted)";
+    emptyMsg.style.padding = "4px 8px";
+    emptyMsg.textContent = getTranslation("empty_state_text");
+    $settingsCategoriesList.appendChild(emptyMsg);
+  } else {
+    customCats.forEach(cat => {
+      const row = document.createElement("div");
+      row.className = "settings-category-row";
+      
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "settings-category-name";
+      nameSpan.textContent = cat;
+      
+      const delBtn = document.createElement("button");
+      delBtn.className = "settings-category-delete";
+      delBtn.dataset.category = cat;
+      delBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      `;
+      
+      row.appendChild(nameSpan);
+      row.appendChild(delBtn);
+      $settingsCategoriesList.appendChild(row);
+    });
+  }
+}
+
+// Chips bar clicks delegation
+$categoriesWrapper.addEventListener("click", (e) => {
+  const chip = e.target.closest(".category-chip");
+  if (chip) {
+    $categoriesWrapper.querySelectorAll(".category-chip").forEach(c => c.classList.remove("category-chip--active"));
     chip.classList.add("category-chip--active");
     currentCategory = chip.dataset.category;
     renderAccounts();
-  });
+  }
+});
+
+// Categories bar horizontal scroll translator for mouse wheels
+const $categoriesBar = document.querySelector(".categories-bar");
+if ($categoriesBar) {
+  $categoriesBar.addEventListener("wheel", (e) => {
+    if (e.deltaY !== 0) {
+      e.preventDefault();
+      $categoriesBar.scrollLeft += e.deltaY * 0.85;
+    }
+  }, { passive: false });
+}
+
+// Select dropdown change listener to toggle inline category inputs
+$selectCategory.addEventListener("change", (e) => {
+  if (e.target.value === "__create_new__") {
+    $newCatInlineContainer.style.display = "flex";
+    $inputNewCatInline.value = "";
+    $inputNewCatInline.focus();
+  } else {
+    $newCatInlineContainer.style.display = "none";
+  }
+});
+
+// Add Category inline save
+$btnSaveNewCatInline.addEventListener("click", async () => {
+  const name = $inputNewCatInline.value.trim();
+  if (!name) {
+    showToast("toast_category_empty", "error");
+    return;
+  }
+
+  if (name.toLowerCase() === "all" || name.toLowerCase() === "none" || DEFAULT_CATEGORIES.includes(name.toLowerCase())) {
+    showToast("toast_category_exists", "error");
+    return;
+  }
+
+  const success = await addCustomCategory(name);
+  if (success) {
+    showToast("toast_category_added", "success");
+    await renderCategoriesUI();
+    
+    // Select the newly created category
+    $selectCategory.value = name;
+    $newCatInlineContainer.style.display = "none";
+    await renderAccounts();
+  } else {
+    showToast("toast_category_exists", "error");
+  }
+});
+
+$inputNewCatInline.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    $btnSaveNewCatInline.click();
+  }
+});
+
+// Add Category inline cancel
+$btnCancelNewCatInline.addEventListener("click", () => {
+  $selectCategory.value = "none";
+  $newCatInlineContainer.style.display = "none";
+});
+
+// Delete Category logic
+$settingsCategoriesList.addEventListener("click", async (e) => {
+  const delBtn = e.target.closest(".settings-category-delete");
+  if (delBtn) {
+    const cat = delBtn.dataset.category;
+    await removeCustomCategory(cat);
+    
+    if (currentCategory === cat) {
+      currentCategory = "all";
+    }
+
+    showToast("toast_category_deleted", "success");
+    await renderCategoriesUI();
+    await renderAccounts();
+  }
 });
 
 /* ================================================================
@@ -1147,6 +1336,9 @@ function formatCode(code) {
   // Set up localized elements
   initTranslations();
   populateSettingsUI();
+
+  // Load Custom Categories UI
+  await renderCategoriesUI();
 
   // Initialize reordering logic
   initDragAndDrop($accounts, showToast);

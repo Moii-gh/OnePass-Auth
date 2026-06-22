@@ -63,13 +63,14 @@
     <input id="input-secret"  type="text" class="add-form__input" data-i18n="input_placeholder_secret" placeholder="Secret key (Base32)" autocomplete="off" spellcheck="false" />
     
     <select id="select-category" class="add-form__select">
-      <option value="none" data-i18n="category_none">No category</option>
-      <option value="personal" data-i18n="category_personal">Personal</option>
-      <option value="work" data-i18n="category_work">Work</option>
-      <option value="finance" data-i18n="category_finance">Finance</option>
-      <option value="social" data-i18n="category_social">Social</option>
-      <option value="other" data-i18n="category_other">Other</option>
+      <!-- Populated dynamically -->
     </select>
+    
+    <div id="add-form-new-cat-container" style="display: none; align-items: center; gap: 8px; margin-top: -6px; margin-bottom: 2px;">
+      <input id="input-new-cat-inline" type="text" class="add-form__input" data-i18n="placeholder_new_category" placeholder="New category name..." maxlength="15" autocomplete="off" style="flex: 1; height: 38px; padding: 0 16px; font-size: 13px;" />
+      <button id="btn-save-new-cat-inline" class="add-form__save" style="flex: 0 0 70px; height: 38px; margin-top: 0; padding: 0;" data-i18n="btn_qr_confirm">Save</button>
+      <button id="btn-cancel-new-cat-inline" class="add-form__save" style="flex: 0 0 70px; height: 38px; margin-top: 0; background: transparent; color: var(--text-secondary); border: 1px solid var(--border); padding: 0;" data-i18n="btn_qr_cancel">Cancel</button>
+    </div>
     
     <button id="btn-save" class="add-form__save" data-i18n="btn_add_account">Add account</button>
   </section>
@@ -152,6 +153,16 @@
         </label>
       </div>
     </div>
+    
+    <!-- Custom Categories Manager -->
+    <div class="settings-group">
+      <label class="settings-label" data-i18n="settings_categories">Custom Categories</label>
+      <div class="settings-categories-manager">
+        <div class="settings-categories-list" id="settings-categories-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
 
     <!-- Security/Privacy Settings -->
     <div class="settings-group">
@@ -224,13 +235,8 @@
 
   <!-- ───────── Categories Horizontal Chips ───────── -->
   <section class="categories-bar">
-    <div class="categories-bar__wrapper">
+    <div class="categories-bar__wrapper" id="categories-wrapper">
       <button class="category-chip category-chip--active" data-category="all" data-i18n="category_all">All</button>
-      <button class="category-chip" data-category="personal" data-i18n="category_personal">Personal</button>
-      <button class="category-chip" data-category="work" data-i18n="category_work">Work</button>
-      <button class="category-chip" data-category="finance" data-i18n="category_finance">Finance</button>
-      <button class="category-chip" data-category="social" data-i18n="category_social">Social</button>
-      <button class="category-chip" data-category="other" data-i18n="category_other">Other</button>
     </div>
   </section>
 

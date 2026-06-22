@@ -53,6 +53,13 @@ const FALLBACK_MAP = {
   "category_social": "Social",
   "category_other": "Other",
   "category_none": "No category",
+  "category_create_new": "+ Create new category...",
+  "settings_categories": "Custom Categories",
+  "placeholder_new_category": "New category name...",
+  "toast_category_added": "Category added",
+  "toast_category_deleted": "Category deleted",
+  "toast_category_exists": "Category already exists",
+  "toast_category_empty": "Please enter a category name",
   
   // Tooltip descriptions
   "panel_title_qr_title": "Import from QR",

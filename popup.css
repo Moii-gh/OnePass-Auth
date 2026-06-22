@@ -1150,3 +1150,85 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   border-color: #111827 !important;
 }
 
+/* ---------- Settings Custom Categories Manager ---------- */
+.settings-categories-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+.settings-categories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+.settings-categories-list::-webkit-scrollbar {
+  width: 4px;
+}
+.settings-categories-list::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 10px;
+}
+.settings-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.settings-category-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  word-break: break-all;
+  padding-right: 8px;
+}
+.settings-category-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: color 0.2s;
+  padding: 4px;
+  flex-shrink: 0;
+}
+.settings-category-delete:hover {
+  color: var(--red);
+}
+.settings-category-delete svg {
+  width: 14px;
+  height: 14px;
+}
+.settings-categories-add {
+  display: flex;
+  gap: 8px;
+}
+.settings-input {
+  flex: 1;
+  height: 38px;
+  padding: 0 16px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  outline: none;
+  transition: border-color .2s;
+}
+.settings-input:focus {
+  border-color: var(--accent);
+}
+.settings-input::placeholder {
+  color: var(--text-muted);
+}
+

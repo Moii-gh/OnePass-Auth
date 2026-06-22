@@ -114,3 +114,61 @@ export async function removeAccount(id) {
   await saveAccounts(accounts);
 }
 
+const CATEGORIES_KEY = "custom_categories";
+
+/**
+ * Load all custom categories.
+ */
+export async function loadCustomCategories() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(CATEGORIES_KEY, (result) => {
+      resolve(result[CATEGORIES_KEY] || []);
+    });
+  });
+}
+
+/**
+ * Save custom categories.
+ */
+export async function saveCustomCategories(categories) {
+  return new Promise((resolve) => {
+    chrome.storage.sync.set({ [CATEGORIES_KEY]: categories }, resolve);
+  });
+}
+
+/**
+ * Add a new custom category name.
+ */
+export async function addCustomCategory(name) {
+  const cleanName = name.trim();
+  if (!cleanName) return false;
+  
+  const categories = await loadCustomCategories();
+  if (categories.includes(cleanName)) return false;
+  
+  categories.push(cleanName);
+  await saveCustomCategories(categories);
+  return true;
+}
+
+/**
+ * Remove a custom category by its name, resetting any linked account categories.
+ */
+export async function removeCustomCategory(name) {
+  let categories = await loadCustomCategories();
+  categories = categories.filter(c => c !== name);
+  await saveCustomCategories(categories);
+  
+  const accounts = await loadAccounts();
+  let updated = false;
+  accounts.forEach(acc => {
+    if (acc.category === name) {
+      acc.category = "none";
+      updated = true;
+    }
+  });
+  if (updated) {
+    await saveAccounts(accounts);
+  }
+}
+
