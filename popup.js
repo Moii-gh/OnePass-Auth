@@ -1130,35 +1130,31 @@ async function reorderAccountsInStorage(fromIndex, fromTargetIndex) {
 }
 
 /* ================================================================
-   Move Mode (Keyboard & Mouse Hover Reordering)
+   Move Mode (Keyboard Reordering)
    ================================================================ */
 let isReorderingMode = false;
 let reorderEl = null;
-let reorderStartClientY = null;
 let reorderOriginalIndex = -1;
 
 function startReorderMode(card) {
   if (isReorderingMode) return;
   isReorderingMode = true;
   reorderEl = card;
-  reorderStartClientY = null;
   reorderOriginalIndex = Array.from($accounts.children).indexOf(card);
 
   $accounts.classList.add("accounts--reordering");
   reorderEl.classList.add("card--reordering");
 
-  document.addEventListener("mousemove", onReorderMouseMove);
   document.addEventListener("keydown", onReorderKeyDown);
   document.addEventListener("click", onReorderClick, { capture: true });
 
-  showToast("Режим перемещения. Стрелки ↑/↓ или ведение мыши.", "success");
+  showToast("Режим перемещения. Используйте стрелки ↑/↓.", "success");
 }
 
 async function stopReorderMode() {
   if (!isReorderingMode) return;
   isReorderingMode = false;
 
-  document.removeEventListener("mousemove", onReorderMouseMove);
   document.removeEventListener("keydown", onReorderKeyDown);
   document.removeEventListener("click", onReorderClick, { capture: true });
 
@@ -1175,43 +1171,6 @@ async function stopReorderMode() {
   }
 
   reorderEl = null;
-  reorderStartClientY = null;
-}
-
-function onReorderMouseMove(e) {
-  if (!isReorderingMode || !reorderEl) return;
-  if (reorderStartClientY === null) {
-    reorderStartClientY = e.clientY;
-  }
-
-  const deltaY = e.clientY - reorderStartClientY;
-  reorderEl.style.transform = `translateY(${deltaY}px) scale(1.02)`;
-
-  const rect = reorderEl.getBoundingClientRect();
-  const centerY = rect.top + rect.height / 2;
-  const centerX = rect.left + rect.width / 2;
-
-  reorderEl.style.visibility = "hidden";
-  const elemBelow = document.elementFromPoint(centerX, centerY);
-  reorderEl.style.visibility = "visible";
-
-  if (!elemBelow) return;
-  const targetCard = elemBelow.closest(".card");
-
-  if (targetCard && targetCard !== reorderEl) {
-    const targetRect = targetCard.getBoundingClientRect();
-    const targetCenterY = targetRect.top + targetRect.height / 2;
-
-    if (e.clientY > targetCenterY && reorderEl.nextElementSibling === targetCard) {
-      animateReorder($accounts, reorderEl, targetCard.nextElementSibling);
-      reorderStartClientY = e.clientY;
-      reorderEl.style.transform = "translateY(0px) scale(1.02)";
-    } else if (e.clientY < targetCenterY && reorderEl.previousElementSibling === targetCard) {
-      animateReorder($accounts, reorderEl, targetCard);
-      reorderStartClientY = e.clientY;
-      reorderEl.style.transform = "translateY(0px) scale(1.02)";
-    }
-  }
 }
 
 function onReorderKeyDown(e) {
@@ -1222,7 +1181,6 @@ function onReorderKeyDown(e) {
     const prev = reorderEl.previousElementSibling;
     if (prev && prev.classList.contains("card")) {
       animateReorder($accounts, reorderEl, prev);
-      reorderStartClientY = null;
       reorderEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   } else if (e.key === "ArrowDown") {
@@ -1230,7 +1188,6 @@ function onReorderKeyDown(e) {
     const next = reorderEl.nextElementSibling;
     if (next && next.classList.contains("card")) {
       animateReorder($accounts, reorderEl, next.nextElementSibling);
-      reorderStartClientY = null;
       reorderEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   } else if (e.key === "Enter" || e.key === "Escape") {
