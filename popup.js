@@ -43,6 +43,16 @@ const $ctxCopy     = document.getElementById("ctx-copy");
 const $ctxDelete   = document.getElementById("ctx-delete");
 let activeCardId   = null;
 
+// Settings panel references
+const $toggleSettings = document.getElementById("btn-toggle-settings");
+const $settingsPanel  = document.getElementById("settings-panel");
+const $colorDots      = document.querySelectorAll(".color-dot");
+const $settingPrivacy = document.getElementById("setting-privacy");
+const $settingClearClipboard = document.getElementById("setting-clear-clipboard");
+const $btnBackupExport = document.getElementById("btn-backup-export");
+const $btnBackupImportTrigger = document.getElementById("btn-backup-import-trigger");
+const $inputBackupFile = document.getElementById("input-backup-file");
+
 /* ================================================================
    Toast
    ================================================================ */
@@ -61,33 +71,40 @@ function showToast(msg, type = "success") {
    Robust Clipboard Copying Helper
    ================================================================ */
 async function copyToClipboard(text) {
+  let success = false;
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);
-      return true;
+      success = true;
     }
   } catch (err) {
     console.warn("navigator.clipboard failed, using fallback", err);
   }
 
-  // Fallback method using temporary textarea
-  try {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.style.position = "fixed";
-    textarea.style.top = "0";
-    textarea.style.left = "0";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    const successful = document.execCommand("copy");
-    document.body.removeChild(textarea);
-    return successful;
-  } catch (err) {
-    console.error("Fallback clipboard copy failed:", err);
-    return false;
+  if (!success) {
+    // Fallback method using temporary textarea
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.top = "0";
+      textarea.style.left = "0";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      success = successful;
+    } catch (err) {
+      console.error("Fallback clipboard copy failed:", err);
+    }
   }
+
+  if (success) {
+    triggerClipboardClearTimer(text);
+  }
+  return success;
 }
 
 /* ================================================================
@@ -95,14 +112,18 @@ async function copyToClipboard(text) {
    ================================================================ */
 let formOpen = false;
 let qrOpen = false;
+let settingsOpen = false;
 
 function closeAllPanels() {
   formOpen = false;
   qrOpen = false;
+  settingsOpen = false;
   $addForm.classList.add("add-form--hidden");
   $qrPanel.classList.add("qr-panel--hidden");
+  $settingsPanel.classList.add("settings-panel--hidden");
   $toggleForm.classList.remove("header__btn--active");
   $toggleQr.classList.remove("header__btn--active");
+  $toggleSettings.classList.remove("header__btn--active");
   resetQrPreview();
 }
 
@@ -126,6 +147,17 @@ $toggleQr.addEventListener("click", () => {
     qrOpen = true;
     $qrPanel.classList.remove("qr-panel--hidden");
     $toggleQr.classList.add("header__btn--active");
+  }
+});
+
+$toggleSettings.addEventListener("click", () => {
+  if (settingsOpen) {
+    closeAllPanels();
+  } else {
+    closeAllPanels();
+    settingsOpen = true;
+    $settingsPanel.classList.remove("settings-panel--hidden");
+    $toggleSettings.classList.add("header__btn--active");
   }
 });
 
@@ -394,6 +426,8 @@ async function renderAccounts() {
     card.dataset.id = acc.id;
     card.dataset.period = period;
 
+    const codeClass = appSettings.privacyMode ? "card__code card__code--hidden" : "card__code";
+
     card.innerHTML = `
       <div class="card__info">
         <div class="card__meta">
@@ -401,7 +435,7 @@ async function renderAccounts() {
           <span class="card__separator">:</span>
           <span class="card__login">${escapeHtml(acc.login)}</span>
         </div>
-        <div class="card__code" data-code>${escapeHtml(code)}</div>
+        <div class="${codeClass}" data-code>${escapeHtml(code)}</div>
       </div>
       <div class="card__right">
         <div class="card__timer">
@@ -583,9 +617,242 @@ function formatCode(code) {
 
 
 /* ================================================================
+   Settings handling
+   ================================================================ */
+const SETTINGS_KEY = "app_settings";
+let appSettings = {
+  accentColor: "white",
+  privacyMode: false,
+  clearClipboardSec: 30
+};
+
+async function loadAppSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(SETTINGS_KEY, (result) => {
+      const saved = result[SETTINGS_KEY] || {};
+      appSettings = {
+        accentColor: saved.accentColor || "white",
+        privacyMode: saved.privacyMode !== undefined ? saved.privacyMode : false,
+        clearClipboardSec: saved.clearClipboardSec !== undefined ? parseInt(saved.clearClipboardSec, 10) : 30
+      };
+      resolve(appSettings);
+    });
+  });
+}
+
+async function saveAppSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [SETTINGS_KEY]: appSettings }, resolve);
+  });
+}
+
+const ACCENT_COLOR_MAP = {
+  white: { accent: "#ffffff", hover: "#e0e0e0", glow: "rgba(255, 255, 255, 0.12)" },
+  green: { accent: "#3ecf8e", hover: "#4de09e", glow: "rgba(62, 207, 142, 0.12)" },
+  blue: { accent: "#1a73e8", hover: "#3b82f6", glow: "rgba(26, 115, 232, 0.12)" },
+  purple: { accent: "#a855f7", hover: "#c084fc", glow: "rgba(168, 85, 247, 0.12)" },
+  orange: { accent: "#f97316", hover: "#fb923c", glow: "rgba(249, 115, 22, 0.12)" }
+};
+
+function applyAccentColor(colorName) {
+  const vars = ACCENT_COLOR_MAP[colorName] || ACCENT_COLOR_MAP.white;
+  document.documentElement.style.setProperty("--accent", vars.accent);
+  document.documentElement.style.setProperty("--accent-hover", vars.hover);
+  document.documentElement.style.setProperty("--accent-glow", vars.glow);
+
+  $colorDots.forEach(dot => {
+    if (dot.dataset.color === colorName) {
+      dot.classList.add("color-dot--active");
+    } else {
+      dot.classList.remove("color-dot--active");
+    }
+  });
+}
+
+function populateSettingsUI() {
+  $settingPrivacy.checked = appSettings.privacyMode;
+  $settingClearClipboard.value = appSettings.clearClipboardSec.toString();
+  applyAccentColor(appSettings.accentColor);
+}
+
+// Clipboard auto-clear helper
+let clipboardClearTimeout = null;
+
+function triggerClipboardClearTimer(copiedText) {
+  clearTimeout(clipboardClearTimeout);
+  if (appSettings.clearClipboardSec <= 0) return;
+
+  clipboardClearTimeout = setTimeout(async () => {
+    try {
+      await navigator.clipboard.writeText("");
+      showToast("Буфер обмена очищен", "success");
+    } catch (err) {
+      console.error("Failed to clear clipboard:", err);
+    }
+  }, appSettings.clearClipboardSec * 1000);
+}
+
+// Event Listeners for Settings Options
+$colorDots.forEach(dot => {
+  dot.addEventListener("click", async () => {
+    const color = dot.dataset.color;
+    appSettings.accentColor = color;
+    applyAccentColor(color);
+    await saveAppSettings();
+    showToast("Акцентный цвет изменен");
+  });
+});
+
+$settingPrivacy.addEventListener("change", async (e) => {
+  appSettings.privacyMode = e.target.checked;
+  await saveAppSettings();
+  await renderAccounts();
+  showToast(appSettings.privacyMode ? "Режим приватности включен" : "Режим приватности выключен");
+});
+
+$settingClearClipboard.addEventListener("change", async (e) => {
+  appSettings.clearClipboardSec = parseInt(e.target.value, 10);
+  await saveAppSettings();
+  showToast("Время автоочистки буфера обновлено");
+});
+
+// Backup Export Logic
+$btnBackupExport.addEventListener("click", async () => {
+  try {
+    const accounts = await loadAccounts();
+    const decryptedAccounts = [];
+    
+    for (const acc of accounts) {
+      try {
+        const plainSecret = await decryptSecret(acc.secret);
+        decryptedAccounts.push({
+          service: acc.service,
+          login: acc.login,
+          secret: plainSecret,
+          period: acc.period || 30,
+          digits: acc.digits || 6,
+          algorithm: acc.algorithm || "SHA-1"
+        });
+      } catch (err) {
+        console.error("Failed to decrypt account during backup export:", acc.service, err);
+      }
+    }
+
+    const backupData = {
+      source: "OnePass Auth Backup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      accounts: decryptedAccounts
+    };
+
+    const jsonString = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `onepass_auth_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Резервная копия скачана");
+  } catch (err) {
+    console.error("Backup export error:", err);
+    showToast("Ошибка экспорта бэкапа", "error");
+  }
+});
+
+// Backup Import Logic
+$btnBackupImportTrigger.addEventListener("click", () => {
+  $inputBackupFile.click();
+});
+
+$inputBackupFile.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (data.source !== "OnePass Auth Backup" || !Array.isArray(data.accounts)) {
+          showToast("Некорректный файл бэкапа", "error");
+          return;
+        }
+
+        const currentAccounts = await loadAccounts();
+        const currentPlainList = [];
+        
+        for (const acc of currentAccounts) {
+          try {
+            const plain = await decryptSecret(acc.secret);
+            currentPlainList.push({ service: acc.service, login: acc.login, secret: plain });
+          } catch (err) {}
+        }
+
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        for (const acc of data.accounts) {
+          if (!acc.service || !acc.login || !acc.secret) {
+            skippedCount++;
+            continue;
+          }
+
+          if (!isValidBase32(acc.secret)) {
+            skippedCount++;
+            continue;
+          }
+
+          const isDuplicate = currentPlainList.some(curr => 
+            curr.service.toLowerCase() === acc.service.toLowerCase() &&
+            curr.login.toLowerCase() === acc.login.toLowerCase() &&
+            curr.secret === acc.secret
+          );
+
+          if (isDuplicate) {
+            skippedCount++;
+            continue;
+          }
+
+          await addAccount(
+            acc.service,
+            acc.login,
+            acc.secret,
+            acc.period || 30,
+            acc.digits || 6,
+            acc.algorithm || "SHA-1"
+          );
+          importedCount++;
+        }
+
+        if (importedCount > 0) {
+          showToast(`Импортировано: ${importedCount} аккаунтов`);
+          await renderAccounts();
+        } else {
+          showToast("Все аккаунты из бэкапа уже добавлены");
+        }
+      } catch (err) {
+        console.error("Failed to parse JSON backup:", err);
+        showToast("Ошибка чтения файла", "error");
+      }
+    };
+    reader.readAsText(file);
+  } catch (err) {
+    console.error("Backup import file error:", err);
+    showToast("Ошибка импорта файла", "error");
+  }
+  $inputBackupFile.value = "";
+});
+
+/* ================================================================
    Boot
    ================================================================ */
 (async () => {
+  await loadAppSettings();
+  populateSettingsUI();
   await renderAccounts();
   tickInterval = setInterval(tick, 1000);
 })();
