@@ -204,7 +204,9 @@ async function processCrop(x, y, w, h) {
         acc.secret,
         acc.period,
         acc.digits,
-        acc.algorithm
+        acc.algorithm,
+        acc.type || "totp",
+        acc.counter || 0
       );
     }
 

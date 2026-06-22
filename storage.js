@@ -15,23 +15,40 @@
 const ACCOUNTS_KEY = "accounts";
 
 /**
- * Load all accounts from storage.
+ * Load all accounts from sync storage. If empty, checks local storage for migration.
  * @returns {Promise<Array>}
  */
 async function loadAccounts() {
-  return new Promise((resolve) =>
-    chrome.storage.local.get(ACCOUNTS_KEY, (result) =>
-      resolve(result[ACCOUNTS_KEY] || [])
-    )
-  );
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(ACCOUNTS_KEY, async (syncResult) => {
+      const syncAccounts = syncResult[ACCOUNTS_KEY];
+      
+      if (syncAccounts) {
+        resolve(syncAccounts);
+      } else {
+        // Checking local storage for migration if sync storage is empty
+        chrome.storage.local.get(ACCOUNTS_KEY, async (localResult) => {
+          const localAccounts = localResult[ACCOUNTS_KEY] || [];
+          if (localAccounts.length > 0) {
+            // Save to sync storage
+            await saveAccounts(localAccounts);
+            // Clear local storage for clean state
+            chrome.storage.local.remove(ACCOUNTS_KEY);
+            console.log("Accounts migrated from local storage to sync storage.");
+          }
+          resolve(localAccounts);
+        });
+      }
+    });
+  });
 }
 
 /**
- * Save full accounts array to storage.
+ * Save full accounts array to sync storage.
  */
 async function saveAccounts(accounts) {
   return new Promise((resolve) =>
-    chrome.storage.local.set({ [ACCOUNTS_KEY]: accounts }, resolve)
+    chrome.storage.sync.set({ [ACCOUNTS_KEY]: accounts }, resolve)
   );
 }
 

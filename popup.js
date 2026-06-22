@@ -726,21 +726,38 @@ let appSettings = {
 
 async function loadAppSettings() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(SETTINGS_KEY, (result) => {
-      const saved = result[SETTINGS_KEY] || {};
-      appSettings = {
-        accentColor: saved.accentColor || "white",
-        privacyMode: saved.privacyMode !== undefined ? saved.privacyMode : false,
-        clearClipboardSec: saved.clearClipboardSec !== undefined ? parseInt(saved.clearClipboardSec, 10) : 30
-      };
-      resolve(appSettings);
+    chrome.storage.sync.get(SETTINGS_KEY, (syncResult) => {
+      const syncSaved = syncResult[SETTINGS_KEY];
+      if (syncSaved) {
+        appSettings = {
+          accentColor: syncSaved.accentColor || "white",
+          privacyMode: syncSaved.privacyMode !== undefined ? syncSaved.privacyMode : false,
+          clearClipboardSec: syncSaved.clearClipboardSec !== undefined ? parseInt(syncSaved.clearClipboardSec, 10) : 30
+        };
+        resolve(appSettings);
+      } else {
+        // Check local storage for migration
+        chrome.storage.local.get(SETTINGS_KEY, async (localResult) => {
+          const localSaved = localResult[SETTINGS_KEY] || {};
+          appSettings = {
+            accentColor: localSaved.accentColor || "white",
+            privacyMode: localSaved.privacyMode !== undefined ? localSaved.privacyMode : false,
+            clearClipboardSec: localSaved.clearClipboardSec !== undefined ? parseInt(localSaved.clearClipboardSec, 10) : 30
+          };
+          // Save to sync
+          await saveAppSettings();
+          // Clean local
+          chrome.storage.local.remove(SETTINGS_KEY);
+          resolve(appSettings);
+        });
+      }
     });
   });
 }
 
 async function saveAppSettings() {
   return new Promise((resolve) => {
-    chrome.storage.local.set({ [SETTINGS_KEY]: appSettings }, resolve);
+    chrome.storage.sync.set({ [SETTINGS_KEY]: appSettings }, resolve);
   });
 }
 
