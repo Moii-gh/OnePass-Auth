@@ -19,7 +19,7 @@ import {
   isValidBase32 
 } from './totp.js';
 import { 
-  initTranslations, getTranslation 
+  initTranslations, getTranslation, setLanguage
 } from './i18n.js';
 import { 
   initDragAndDrop, startReorderMode 
@@ -81,6 +81,7 @@ const $toggleSettings = document.getElementById("btn-toggle-settings");
 const $settingsPanel  = document.getElementById("settings-panel");
 const $colorDots      = document.querySelectorAll(".color-dot");
 const $settingThemeMode = document.getElementById("setting-theme-mode");
+const $settingLanguage = document.getElementById("setting-language");
 const $settingPrivacy = document.getElementById("setting-privacy");
 const $settingPinLock = document.getElementById("setting-pin-lock");
 const $settingClearClipboard = document.getElementById("setting-clear-clipboard");
@@ -92,9 +93,8 @@ const $inputBackupFile = document.getElementById("input-backup-file");
 const $inputSearch    = document.getElementById("input-search");
 const $btnSearchClear = document.getElementById("btn-search-clear");
 
-// Categories chips & manager references
+// Categories chips references
 const $categoriesWrapper = document.getElementById("categories-wrapper");
-const $settingsCategoriesList = document.getElementById("settings-categories-list");
 
 // Inline category creator references
 const $newCatInlineContainer = document.getElementById("add-form-new-cat-container");
@@ -756,6 +756,7 @@ const SETTINGS_KEY = "app_settings";
 let appSettings = {
   accentColor: "white",
   themeMode: "dark",
+  language: "auto",
   privacyMode: false,
   clearClipboardSec: 30
 };
@@ -768,6 +769,7 @@ async function loadAppSettings() {
         appSettings = {
           accentColor: syncSaved.accentColor || "white",
           themeMode: syncSaved.themeMode || "dark",
+          language: syncSaved.language || "auto",
           privacyMode: syncSaved.privacyMode !== undefined ? syncSaved.privacyMode : false,
           clearClipboardSec: syncSaved.clearClipboardSec !== undefined ? parseInt(syncSaved.clearClipboardSec, 10) : 30
         };
@@ -778,6 +780,7 @@ async function loadAppSettings() {
           appSettings = {
             accentColor: localSaved.accentColor || "white",
             themeMode: localSaved.themeMode || "dark",
+            language: localSaved.language || "auto",
             privacyMode: localSaved.privacyMode !== undefined ? localSaved.privacyMode : false,
             clearClipboardSec: localSaved.clearClipboardSec !== undefined ? parseInt(localSaved.clearClipboardSec, 10) : 30
           };
@@ -800,6 +803,7 @@ async function populateSettingsUI() {
   $settingPrivacy.checked = appSettings.privacyMode;
   $settingClearClipboard.value = appSettings.clearClipboardSec.toString();
   $settingThemeMode.value = appSettings.themeMode;
+  $settingLanguage.value = appSettings.language;
   applyThemeMode(appSettings.themeMode);
   applyAccentColor(appSettings.accentColor, $colorDots, appSettings.themeMode);
   
@@ -856,6 +860,17 @@ $settingThemeMode.addEventListener("change", async (e) => {
   appSettings.themeMode = selectedTheme;
   applyThemeMode(selectedTheme);
   applyAccentColor(appSettings.accentColor, $colorDots, selectedTheme);
+  await saveAppSettings();
+});
+
+// Language select setting
+$settingLanguage.addEventListener("change", async (e) => {
+  const selectedLang = e.target.value;
+  appSettings.language = selectedLang;
+  setLanguage(selectedLang);
+  initTranslations();
+  await renderCategoriesUI();
+  await renderAccounts();
   await saveAppSettings();
 });
 
@@ -990,40 +1005,6 @@ async function renderCategoriesUI() {
   $selectCategory.appendChild(optCreate);
 
   $selectCategory.value = selectedValBefore;
-
-  // 3. Render list in Settings Manager
-  $settingsCategoriesList.innerHTML = "";
-  if (customCats.length === 0) {
-    const emptyMsg = document.createElement("div");
-    emptyMsg.style.fontSize = "12px";
-    emptyMsg.style.color = "var(--text-muted)";
-    emptyMsg.style.padding = "4px 8px";
-    emptyMsg.textContent = getTranslation("empty_state_text");
-    $settingsCategoriesList.appendChild(emptyMsg);
-  } else {
-    customCats.forEach(cat => {
-      const row = document.createElement("div");
-      row.className = "settings-category-row";
-      
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "settings-category-name";
-      nameSpan.textContent = cat;
-      
-      const delBtn = document.createElement("button");
-      delBtn.className = "settings-category-delete";
-      delBtn.dataset.category = cat;
-      delBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-      `;
-      
-      row.appendChild(nameSpan);
-      row.appendChild(delBtn);
-      $settingsCategoriesList.appendChild(row);
-    });
-  }
 }
 
 // Chips bar clicks delegation
@@ -1099,22 +1080,7 @@ $btnCancelNewCatInline.addEventListener("click", () => {
   $newCatInlineContainer.style.display = "none";
 });
 
-// Delete Category logic
-$settingsCategoriesList.addEventListener("click", async (e) => {
-  const delBtn = e.target.closest(".settings-category-delete");
-  if (delBtn) {
-    const cat = delBtn.dataset.category;
-    await removeCustomCategory(cat);
-    
-    if (currentCategory === cat) {
-      currentCategory = "all";
-    }
-
-    showToast("toast_category_deleted", "success");
-    await renderCategoriesUI();
-    await renderAccounts();
-  }
-});
+// Note: Categories management is handled inline within the add/edit form
 
 /* ================================================================
    PIN Lock / Unlock screen controls
@@ -1334,6 +1300,7 @@ function formatCode(code) {
   await loadAppSettings();
   
   // Set up localized elements
+  setLanguage(appSettings.language);
   initTranslations();
   populateSettingsUI();
 
