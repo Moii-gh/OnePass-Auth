@@ -25,9 +25,11 @@ const $toast      = document.getElementById("toast");
 const $inputSvc   = document.getElementById("input-service");
 const $inputLogin = document.getElementById("input-login");
 const $inputKey   = document.getElementById("input-secret");
-const $inputType   = document.getElementById("input-type");
-const $inputCounter = document.getElementById("input-counter");
 const $btnSave    = document.getElementById("btn-save");
+
+// State for manual account type (can be auto-detected if pasting a full otpauth URL)
+let manualAccountType = "totp";
+let manualAccountCounter = 0;
 
 // QR panel components
 const $btnQrScreen  = document.getElementById("btn-qr-screen");
@@ -131,20 +133,10 @@ function closeAllPanels() {
   $toggleForm.classList.remove("header__btn--active");
   $toggleQr.classList.remove("header__btn--active");
   $toggleSettings.classList.remove("header__btn--active");
-  $inputType.value = "totp";
-  $inputCounter.value = "0";
-  $inputCounter.style.display = "none";
+  manualAccountType = "totp";
+  manualAccountCounter = 0;
   resetQrPreview();
 }
-
-$inputType.addEventListener("change", () => {
-  if ($inputType.value === "hotp") {
-    $inputCounter.style.display = "block";
-    $inputCounter.focus();
-  } else {
-    $inputCounter.style.display = "none";
-  }
-});
 
 $toggleForm.addEventListener("click", () => {
   if (formOpen) {
@@ -184,21 +176,18 @@ $toggleSettings.addEventListener("click", () => {
    Save handler (Manual)
    ================================================================ */
 $btnSave.addEventListener("click", async () => {
-  [$inputSvc, $inputLogin, $inputKey, $inputCounter].forEach((el) =>
+  [$inputSvc, $inputLogin, $inputKey].forEach((el) =>
     el.classList.remove("add-form__input--error")
   );
 
   const service = $inputSvc.value.trim();
   const login   = $inputLogin.value.trim();
   const secret  = $inputKey.value.trim().replace(/\s+/g, "");
-  const type    = $inputType.value;
-  const counter = parseInt($inputCounter.value, 10) || 0;
 
   let hasError = false;
   if (!service) { $inputSvc.classList.add("add-form__input--error"); hasError = true; }
   if (!login)   { $inputLogin.classList.add("add-form__input--error"); hasError = true; }
   if (!secret)  { $inputKey.classList.add("add-form__input--error"); hasError = true; }
-  if (type === "hotp" && (isNaN(counter) || counter < 0)) { $inputCounter.classList.add("add-form__input--error"); hasError = true; }
 
   if (hasError) {
     showToast("Заполните все поля корректно", "error");
@@ -212,19 +201,39 @@ $btnSave.addEventListener("click", async () => {
   }
 
   try {
-    await addAccount(service, login, secret, 30, 6, "SHA-1", type, counter);
+    await addAccount(service, login, secret, 30, 6, "SHA-1", manualAccountType, manualAccountCounter);
     $inputSvc.value = "";
     $inputLogin.value = "";
     $inputKey.value = "";
-    $inputType.value = "totp";
-    $inputCounter.value = "0";
-    $inputCounter.style.display = "none";
+    manualAccountType = "totp";
+    manualAccountCounter = 0;
     closeAllPanels();
     showToast("Аккаунт добавлен!");
     await renderAccounts();
   } catch (err) {
     console.error(err);
     showToast("Ошибка сохранения аккаунта", "error");
+  }
+});
+
+// Auto-parse pasted otpauth:// links in manual form secret field
+$inputKey.addEventListener("input", () => {
+  const value = $inputKey.value.trim();
+  if (value.startsWith("otpauth://")) {
+    try {
+      const parsedList = parseOtpauthUrl(value);
+      if (parsedList && parsedList.length > 0) {
+        const acc = parsedList[0];
+        $inputSvc.value = acc.service || "";
+        $inputLogin.value = acc.login || "";
+        $inputKey.value = acc.secret || "";
+        manualAccountType = acc.type || "totp";
+        manualAccountCounter = acc.counter || 0;
+        showToast("Данные распознаны из ссылки!");
+      }
+    } catch (err) {
+      console.warn("Failed to auto-parse pasted otpauth URL:", err);
+    }
   }
 });
 
@@ -560,8 +569,8 @@ $accounts.addEventListener("contextmenu", (e) => {
     // Show and position the context menu
     $contextMenu.classList.remove("context-menu--hidden");
 
-    const menuWidth = 170;
-    const menuHeight = 90;
+    const menuWidth = $contextMenu.offsetWidth || 170;
+    const menuHeight = $contextMenu.offsetHeight || 130;
     let x = e.clientX;
     let y = e.clientY;
 
