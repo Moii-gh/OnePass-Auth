@@ -31,24 +31,24 @@
 
   /* misc */
   --border:         rgba(255,255,255,.06);
-  --radius:         24px;
-  --radius-sm:      14px;
-  --shadow-card:    0 4px 16px rgba(0,0,0,.35);
+  --radius:         28px;
+  --radius-sm:      16px;
+  --shadow-card:    0 6px 20px rgba(0,0,0,.4);
 
   /* timer ring */
-  --timer-size:     38px;
+  --timer-size:     42px;
 }
 
 /* ---------- Reset ---------- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  width: 340px;
-  min-height: 260px;
+  width: 380px;
+  min-height: 280px;
   max-height: 600px;
   overflow-y: auto;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary);
   background: var(--bg-base);
   scrollbar-width: thin;
@@ -62,7 +62,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 22px 16px;
+  padding: 24px 24px 18px;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -72,26 +72,26 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .header__brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 .header__icon {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   color: var(--accent);
 }
 .header__title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: -.3px;
+  letter-spacing: -.5px;
   color: #ffffff;
 }
 .header__actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 .header__btn {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
@@ -101,7 +101,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   cursor: pointer;
   transition: all .2s;
 }
-.header__btn svg { width: 18px; height: 18px; }
+.header__btn svg { width: 20px; height: 20px; }
 .header__btn:hover {
   color: var(--accent);
   border-color: var(--accent);
@@ -115,20 +115,20 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 
 /* Titles inside forms */
 .form-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 /* ---------- Add-account form ---------- */
 .add-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px 22px 22px;
+  gap: 14px;
+  padding: 20px 24px 24px;
   background: var(--bg-form);
   border-bottom: 1px solid var(--border);
   animation: slideDown .25s ease;
@@ -141,14 +141,14 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 
 .add-form__input {
-  height: 44px;
-  padding: 0 20px;
+  height: 48px;
+  padding: 0 22px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-primary);
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: 24px;
   outline: none;
   transition: border-color .2s, box-shadow .2s;
 }
@@ -163,15 +163,15 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 
 .add-form__save {
-  height: 44px;
+  height: 48px;
   margin-top: 6px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: #000000;
   background: var(--accent);
   border: none;
-  border-radius: 22px;
+  border-radius: 24px;
   cursor: pointer;
   transition: background .2s, transform .1s;
 }
@@ -182,8 +182,8 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .qr-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 18px 22px 22px;
+  gap: 16px;
+  padding: 20px 24px 24px;
   background: var(--bg-form);
   border-bottom: 1px solid var(--border);
   animation: slideDown .25s ease;
@@ -192,28 +192,28 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 
 .qr-panel__quick-actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 2px;
 }
 
 .qr-panel__btn-action {
   flex: 1;
-  height: 42px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   border: none;
-  border-radius: 21px;
+  border-radius: 23px;
   cursor: pointer;
   transition: all .2s, transform .1s;
 }
 .qr-panel__btn-action svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 .qr-panel__btn-action:active {
   transform: scale(.97);
@@ -243,7 +243,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 20px;
+  padding: 38px 24px;
   border: 1.5px dashed var(--border);
   border-radius: var(--radius);
   background: var(--bg-input);
@@ -256,18 +256,18 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   background: rgba(255,255,255,.01);
 }
 .qr-panel__icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   color: var(--text-secondary);
   margin-bottom: 10px;
 }
 .qr-panel__text {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text-primary);
 }
 .qr-panel__subtext {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   margin-top: 4px;
 }
@@ -372,8 +372,8 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .accounts {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px 20px 20px;
+  gap: 16px;
+  padding: 18px 24px 24px;
 }
 
 /* ---------- Account card ---------- */
@@ -381,8 +381,8 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   position: relative;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 20px;
+  gap: 20px;
+  padding: 22px 24px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -402,13 +402,13 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 .card__meta {
   display: flex;
   flex-wrap: nowrap;
   align-items: baseline;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -418,13 +418,13 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   display: none;
 }
 .card__service {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
   flex-shrink: 0;
 }
 .card__separator {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   font-weight: 400;
   user-select: none;
@@ -432,16 +432,16 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 .card__login {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
 /* code */
 .card__code {
   font-family: 'JetBrains Mono', 'Consolas', monospace;
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
-  letter-spacing: 4px;
+  letter-spacing: 5px;
   color: #ffffff;
   user-select: none;
   flex-shrink: 0;
@@ -459,7 +459,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -491,7 +491,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--timer-color, var(--text-secondary));
   transition: color 0.3s ease;
@@ -530,23 +530,23 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 64px 24px 48px;
-  gap: 10px;
+  padding: 80px 32px 64px;
+  gap: 12px;
 }
 .empty-state--hidden { display: none; }
 .empty-state__icon {
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   color: var(--text-muted);
   margin-bottom: 8px;
 }
 .empty-state__text {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-secondary);
 }
 .empty-state__hint {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   text-align: center;
 }
@@ -634,8 +634,8 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .settings-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 18px 22px 22px;
+  gap: 20px;
+  padding: 20px 24px 24px;
   background: var(--bg-form);
   border-bottom: 1px solid var(--border);
   animation: slideDown .25s ease;
@@ -645,9 +645,9 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .settings-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   border-bottom: 1px solid rgba(255,255,255,.03);
-  padding-bottom: 14px;
+  padding-bottom: 16px;
 }
 .settings-group:last-of-type {
   border-bottom: none;
@@ -655,7 +655,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 
 .settings-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -665,12 +665,12 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 /* Color Picker */
 .color-picker {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   margin-top: 4px;
 }
 .color-dot {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
@@ -692,7 +692,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 
 /* Settings Options (Checkbox, Select) */
 .settings-option-wrapper {
-  padding: 4px 0;
+  padding: 6px 0;
 }
 .settings-option {
   display: flex;
@@ -702,18 +702,18 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   user-select: none;
 }
 .settings-option__text {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary);
 }
 
 /* Custom checkbox / Select styling */
 .settings-checkbox {
   appearance: none;
-  width: 36px;
-  height: 20px;
+  width: 40px;
+  height: 22px;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 11px;
   position: relative;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
@@ -725,8 +725,8 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .settings-checkbox::before {
   content: '';
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #ffffff;
   top: 2px;
@@ -734,7 +734,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   transition: transform 0.2s;
 }
 .settings-checkbox:checked::before {
-  transform: translateX(16px);
+  transform: translateX(20px);
   background: #000000;
 }
 
@@ -743,9 +743,9 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  padding: 6px 12px;
+  padding: 8px 14px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   outline: none;
   cursor: pointer;
   transition: border-color 0.2s;
@@ -757,21 +757,21 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 /* Backup settings actions */
 .settings-actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   margin-top: 4px;
 }
 .settings-btn {
   flex: 1;
-  height: 36px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   border: none;
-  border-radius: 18px;
+  border-radius: 20px;
   cursor: pointer;
   transition: all 0.2s, transform 0.1s;
 }
@@ -823,7 +823,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 
 /* ---------- Search Bar ---------- */
 .search-bar {
-  padding: 8px 20px 12px;
+  padding: 10px 24px 14px;
   background: var(--bg-base);
   animation: slideDown .25s ease;
 }
@@ -835,22 +835,22 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 .search-bar__icon {
   position: absolute;
-  left: 14px;
-  width: 16px;
-  height: 16px;
+  left: 16px;
+  width: 18px;
+  height: 18px;
   color: var(--text-muted);
   pointer-events: none;
 }
 .search-bar__input {
   width: 100%;
-  height: 38px;
-  padding: 0 40px;
+  height: 42px;
+  padding: 0 46px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary);
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 19px;
+  border-radius: 21px;
   outline: none;
   transition: border-color .2s, box-shadow .2s;
 }
@@ -863,9 +863,9 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 .search-bar__clear {
   position: absolute;
-  right: 14px;
-  width: 16px;
-  height: 16px;
+  right: 16px;
+  width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
   border: none;
@@ -879,8 +879,8 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   color: var(--text-primary);
 }
 .search-bar__clear svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 .search-bar__clear--hidden {
   display: none;
