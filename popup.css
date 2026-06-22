@@ -524,6 +524,36 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .card__btn--copy:hover  { background: var(--green-bg); color: var(--green); }
 .card__btn--delete:hover { background: var(--red-bg);  color: var(--red); }
 
+/* refresh button for HOTP */
+.card__btn-refresh {
+  width: var(--timer-size);
+  height: var(--timer-size);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all .2s, transform .1s;
+}
+.card__btn-refresh svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.4s ease;
+}
+.card__btn-refresh:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.card__btn-refresh:hover svg {
+  transform: rotate(180deg);
+}
+.card__btn-refresh:active {
+  transform: scale(.92);
+}
+
 /* ---------- Empty state ---------- */
 .empty-state {
   display: flex;

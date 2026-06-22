@@ -25,6 +25,8 @@ const $toast      = document.getElementById("toast");
 const $inputSvc   = document.getElementById("input-service");
 const $inputLogin = document.getElementById("input-login");
 const $inputKey   = document.getElementById("input-secret");
+const $inputType   = document.getElementById("input-type");
+const $inputCounter = document.getElementById("input-counter");
 const $btnSave    = document.getElementById("btn-save");
 
 // QR panel components
@@ -129,8 +131,20 @@ function closeAllPanels() {
   $toggleForm.classList.remove("header__btn--active");
   $toggleQr.classList.remove("header__btn--active");
   $toggleSettings.classList.remove("header__btn--active");
+  $inputType.value = "totp";
+  $inputCounter.value = "0";
+  $inputCounter.style.display = "none";
   resetQrPreview();
 }
+
+$inputType.addEventListener("change", () => {
+  if ($inputType.value === "hotp") {
+    $inputCounter.style.display = "block";
+    $inputCounter.focus();
+  } else {
+    $inputCounter.style.display = "none";
+  }
+});
 
 $toggleForm.addEventListener("click", () => {
   if (formOpen) {
@@ -170,21 +184,24 @@ $toggleSettings.addEventListener("click", () => {
    Save handler (Manual)
    ================================================================ */
 $btnSave.addEventListener("click", async () => {
-  [$inputSvc, $inputLogin, $inputKey].forEach((el) =>
+  [$inputSvc, $inputLogin, $inputKey, $inputCounter].forEach((el) =>
     el.classList.remove("add-form__input--error")
   );
 
   const service = $inputSvc.value.trim();
   const login   = $inputLogin.value.trim();
   const secret  = $inputKey.value.trim().replace(/\s+/g, "");
+  const type    = $inputType.value;
+  const counter = parseInt($inputCounter.value, 10) || 0;
 
   let hasError = false;
   if (!service) { $inputSvc.classList.add("add-form__input--error"); hasError = true; }
   if (!login)   { $inputLogin.classList.add("add-form__input--error"); hasError = true; }
   if (!secret)  { $inputKey.classList.add("add-form__input--error"); hasError = true; }
+  if (type === "hotp" && (isNaN(counter) || counter < 0)) { $inputCounter.classList.add("add-form__input--error"); hasError = true; }
 
   if (hasError) {
-    showToast("Заполните все поля", "error");
+    showToast("Заполните все поля корректно", "error");
     return;
   }
 
@@ -195,10 +212,13 @@ $btnSave.addEventListener("click", async () => {
   }
 
   try {
-    await addAccount(service, login, secret);
+    await addAccount(service, login, secret, 30, 6, "SHA-1", type, counter);
     $inputSvc.value = "";
     $inputLogin.value = "";
     $inputKey.value = "";
+    $inputType.value = "totp";
+    $inputCounter.value = "0";
+    $inputCounter.style.display = "none";
     closeAllPanels();
     showToast("Аккаунт добавлен!");
     await renderAccounts();
@@ -232,7 +252,8 @@ function handleRecognizedAccounts(accountList) {
     item.style.paddingBottom = "4px";
 
     const maskedSecret = acc.secret.slice(0, 6) + "..." + acc.secret.slice(-4);
-    const algoStr = `${acc.algorithm}, ${acc.digits} dig, ${acc.period}s`;
+    const typeStr = acc.type === "hotp" ? `HOTP (ctr: ${acc.counter})` : `TOTP (${acc.period || 30}s)`;
+    const algoStr = `${acc.algorithm || "SHA-1"}, ${acc.digits || 6} dig, ${typeStr}`;
 
     item.innerHTML = `
       <div class="qr-preview__field">
@@ -361,7 +382,9 @@ $btnQrConfirm.addEventListener("click", async () => {
         acc.secret,
         acc.period,
         acc.digits,
-        acc.algorithm
+        acc.algorithm,
+        acc.type || "totp",
+        acc.counter || 0
       );
     }
     showToast(pendingQrAccounts.length === 1 ? "Импортировано из QR!" : `Импортировано аккаунтов: ${pendingQrAccounts.length}`);
@@ -411,38 +434,38 @@ async function renderAccounts() {
     const period = acc.period || 30;
     const digits = acc.digits || 6;
     const algorithm = acc.algorithm || "SHA-1";
+    const type = acc.type || "totp";
+    const counter = acc.counter || 0;
 
     let code = "ERROR";
     let isError = false;
     try {
-      const rawCode = await generateTOTP(secret, period, digits, algorithm);
-      code = formatCode(rawCode);
+      if (type === "totp") {
+        const rawCode = await generateTOTP(secret, period, digits, algorithm);
+        code = formatCode(rawCode);
+      } else {
+        const rawCode = await generateHOTP(secret, counter, digits, algorithm);
+        code = formatCode(rawCode);
+      }
     } catch (err) {
-      console.error("Failed to generate TOTP code for: " + acc.service, err);
+      console.error("Failed to generate OTP code for: " + acc.service, err);
       isError = true;
     }
-
-    const secs = secondsRemaining(period);
-    const fraction = secs / period;
-    const dashoffset = TIMER_CIRCUMFERENCE * (1 - fraction);
 
     const card = document.createElement("div");
     card.className = "card";
     card.dataset.id = acc.id;
-    card.dataset.period = period;
+    card.dataset.type = type;
 
     const codeClass = appSettings.privacyMode ? "card__code card__code--hidden" : "card__code";
 
-    card.innerHTML = `
-      <div class="card__info">
-        <div class="card__meta">
-          <span class="card__service">${escapeHtml(acc.service)}</span>
-          <span class="card__separator">:</span>
-          <span class="card__login">${escapeHtml(acc.login)}</span>
-        </div>
-        <div class="${codeClass}" data-code>${escapeHtml(code)}</div>
-      </div>
-      <div class="card__right">
+    let rightSideHtml = "";
+    if (type === "totp") {
+      card.dataset.period = period;
+      const secs = secondsRemaining(period);
+      const fraction = secs / period;
+      const dashoffset = TIMER_CIRCUMFERENCE * (1 - fraction);
+      rightSideHtml = `
         <div class="${secs <= 5 ? 'card__timer card__timer--danger' : secs <= 10 ? 'card__timer card__timer--warn' : 'card__timer'}">
           <svg viewBox="0 0 36 36">
             <circle class="card__timer-bg" cx="18" cy="18" r="14"/>
@@ -454,6 +477,28 @@ async function renderAccounts() {
           </svg>
           <span class="card__timer-text" data-timer-text>${secs}</span>
         </div>
+      `;
+    } else {
+      rightSideHtml = `
+        <button class="card__btn-refresh" data-id="${acc.id}" title="Сгенерировать следующий код">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+        </button>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="card__info">
+        <div class="card__meta">
+          <span class="card__service">${escapeHtml(acc.service)}</span>
+          <span class="card__separator">:</span>
+          <span class="card__login">${escapeHtml(acc.login)}</span>
+        </div>
+        <div class="${codeClass}" data-code>${escapeHtml(code)}</div>
+      </div>
+      <div class="card__right">
+        ${rightSideHtml}
       </div>
     `;
 
@@ -465,7 +510,23 @@ async function renderAccounts() {
    Event Delegation for Copy & Delete actions
    ================================================================ */
 $accounts.addEventListener("click", async (e) => {
-  // Left click on card or code to copy the TOTP token
+  const refreshBtn = e.target.closest(".card__btn-refresh");
+  if (refreshBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = refreshBtn.dataset.id;
+    try {
+      await incrementCounter(id);
+      showToast("Код обновлен!");
+      await renderAccounts();
+    } catch (err) {
+      console.error(err);
+      showToast("Ошибка обновления кода", "error");
+    }
+    return;
+  }
+
+  // Left click on card or code to copy the OTP token
   const card = e.target.closest(".card");
   if (card) {
     e.preventDefault();
@@ -588,7 +649,7 @@ let tickInterval = null;
 async function tick() {
   let needsReRender = false;
 
-  document.querySelectorAll(".card").forEach((card) => {
+  document.querySelectorAll(".card[data-type='totp']").forEach((card) => {
     const period = parseInt(card.dataset.period, 10) || 30;
     const secs = secondsRemaining(period);
     const fraction = secs / period;
@@ -759,7 +820,9 @@ $btnBackupExport.addEventListener("click", async () => {
           secret: plainSecret,
           period: acc.period || 30,
           digits: acc.digits || 6,
-          algorithm: acc.algorithm || "SHA-1"
+          algorithm: acc.algorithm || "SHA-1",
+          type: acc.type || "totp",
+          counter: acc.counter || 0
         });
       } catch (err) {
         console.error("Failed to decrypt account during backup export:", acc.service, err);
@@ -851,7 +914,9 @@ $inputBackupFile.addEventListener("change", async (e) => {
             acc.secret,
             acc.period || 30,
             acc.digits || 6,
-            acc.algorithm || "SHA-1"
+            acc.algorithm || "SHA-1",
+            acc.type || "totp",
+            acc.counter || 0
           );
           importedCount++;
         }

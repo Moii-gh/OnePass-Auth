@@ -104,3 +104,50 @@ async function generateTOTP(secretBase32, period = DEFAULT_TOTP_PERIOD, digits =
 function secondsRemaining(period = DEFAULT_TOTP_PERIOD) {
   return period - (Math.floor(Date.now() / 1000) % period);
 }
+
+/**
+ * Generate a HOTP code for a given secret and counter (RFC 4226).
+ * @param {string} secretBase32 – the raw Base32-encoded secret
+ * @param {number} counter – the HOTP counter value
+ * @param {number} digits – code length
+ * @param {string} algorithm – HMAC hash algorithm
+ * @returns {Promise<string>} digits-digit zero-padded code
+ */
+async function generateHOTP(secretBase32, counter, digits = DEFAULT_TOTP_DIGITS, algorithm = DEFAULT_TOTP_ALGO) {
+  const keyBytes = base32ToBytes(secretBase32);
+
+  // Convert counter to 8-byte big-endian buffer
+  const counterBuf = new ArrayBuffer(8);
+  const view = new DataView(counterBuf);
+  const high = Math.floor(counter / 0x100000000);
+  const low = counter % 0x100000000;
+  view.setUint32(0, high, false);
+  view.setUint32(4, low, false);
+
+  let hashName = algorithm.toUpperCase();
+  if (hashName === "SHA1") hashName = "SHA-1";
+  if (hashName === "SHA256") hashName = "SHA-256";
+  if (hashName === "SHA512") hashName = "SHA-512";
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    { name: "HMAC", hash: hashName },
+    false,
+    ["sign"]
+  );
+  const hmac = new Uint8Array(
+    await crypto.subtle.sign("HMAC", cryptoKey, counterBuf)
+  );
+
+  // Dynamic truncation (RFC 4226 §5.4)
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const binary =
+    ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+
+  const otp = binary % Math.pow(10, digits);
+  return otp.toString().padStart(digits, "0");
+}

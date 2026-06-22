@@ -114,7 +114,8 @@ function parseOtpParameters(buffer) {
     issuer: "",
     algorithm: 1, // ALGORITHM_SHA1
     digits: 1,    // DIGIT_COUNT_SIX
-    type: 2       // OTP_TYPE_TOTP
+    type: 2,      // OTP_TYPE_TOTP
+    counter: 0
   };
 
   while (offset < buffer.length) {
@@ -129,6 +130,7 @@ function parseOtpParameters(buffer) {
       if (tag === 4) result.algorithm = value;
       else if (tag === 5) result.digits = value;
       else if (tag === 6) result.type = value;
+      else if (tag === 7) result.counter = value;
     } else if (wireType === 2) { // Length-delimited
       const { value: length, offset: lenOffset } = readVarint(buffer, offset);
       offset = lenOffset;
@@ -205,19 +207,25 @@ function parseMigrationUrl(urlStr) {
     if (!service) service = "Service";
     if (!login) login = "user";
 
+    // otp.type enum: 1=HOTP, 2=TOTP
+    const type = otp.type === 1 ? "hotp" : "totp";
+    const counter = otp.counter || 0;
+
     return {
       service: service,
       login: login,
       secret: secretBase32,
       period: 30, // Google migration payload assumes 30s period
       digits: digits,
-      algorithm: algorithm
+      algorithm: algorithm,
+      type: type,
+      counter: counter
     };
   });
 }
 
 /**
- * Validates and parses standard otpauth://totp/ URI.
+ * Validates and parses standard otpauth://totp/ or otpauth://hotp/ URI.
  *
  * @param {string} urlStr
  * @returns {Object} parsed account data
@@ -227,8 +235,11 @@ function parseOtpauthUrl(urlStr) {
     return parseMigrationUrl(urlStr);
   }
 
-  if (!urlStr.startsWith("otpauth://totp/")) {
-    throw new Error("Неверный формат: QR-код должен начинаться с 'otpauth://totp/' или 'otpauth-migration://'");
+  const isTotp = urlStr.startsWith("otpauth://totp/");
+  const isHotp = urlStr.startsWith("otpauth://hotp/");
+
+  if (!isTotp && !isHotp) {
+    throw new Error("Неверный формат: QR-код должен начинаться с 'otpauth://totp/', 'otpauth://hotp/' или 'otpauth-migration://'");
   }
 
   const url = new URL(urlStr);
@@ -262,6 +273,8 @@ function parseOtpauthUrl(urlStr) {
   const period = parseInt(params.get("period"), 10) || 30;
   const digits = parseInt(params.get("digits"), 10) || 6;
   const algorithm = (params.get("algorithm") || "SHA1").toUpperCase();
+  const type = isTotp ? "totp" : "hotp";
+  const counter = parseInt(params.get("counter"), 10) || 0;
 
   // Return inside an array to normalize the outputs
   return [{
@@ -270,7 +283,9 @@ function parseOtpauthUrl(urlStr) {
     secret: secret,
     period: period,
     digits: digits,
-    algorithm: algorithm
+    algorithm: algorithm,
+    type: type,
+    counter: counter
   }];
 }
 

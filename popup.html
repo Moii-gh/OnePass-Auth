@@ -61,6 +61,13 @@
     <input id="input-service" type="text" class="add-form__input" placeholder="Service name (e.g. Google)" autocomplete="off" />
     <input id="input-login"   type="text" class="add-form__input" placeholder="Login / email" autocomplete="off" />
     <input id="input-secret"  type="text" class="add-form__input" placeholder="Secret key (Base32)" autocomplete="off" spellcheck="false" />
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <select id="input-type" class="settings-select" style="flex: 1; height: 48px; border-radius: 24px; padding: 0 20px;">
+        <option value="totp" selected>Type: TOTP</option>
+        <option value="hotp">Type: HOTP</option>
+      </select>
+      <input id="input-counter" type="number" class="add-form__input" placeholder="Initial Counter" value="0" min="0" style="flex: 1; display: none;" />
+    </div>
     <button id="btn-save" class="add-form__save">Add account</button>
   </section>
 

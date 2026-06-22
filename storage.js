@@ -43,8 +43,10 @@ async function saveAccounts(accounts) {
  * @param {number} period
  * @param {number} digits
  * @param {string} algorithm
+ * @param {string} type – "totp" or "hotp"
+ * @param {number} counter – initial counter value for HOTP
  */
-async function addAccount(service, login, secretPlain, period = 30, digits = 6, algorithm = "SHA-1") {
+async function addAccount(service, login, secretPlain, period = 30, digits = 6, algorithm = "SHA-1", type = "totp", counter = 0) {
   const encrypted = await encryptSecret(secretPlain);
   const accounts = await loadAccounts();
   accounts.push({
@@ -54,9 +56,27 @@ async function addAccount(service, login, secretPlain, period = 30, digits = 6, 
     secret: encrypted,
     period,
     digits,
-    algorithm
+    algorithm,
+    type,
+    counter
   });
   await saveAccounts(accounts);
+}
+
+/**
+ * Increment HOTP counter for an account.
+ * @param {string} id
+ * @returns {Promise<number|null>} new counter value, or null if account not found
+ */
+async function incrementCounter(id) {
+  const accounts = await loadAccounts();
+  const index = accounts.findIndex(a => a.id === id);
+  if (index !== -1) {
+    accounts[index].counter = (accounts[index].counter || 0) + 1;
+    await saveAccounts(accounts);
+    return accounts[index].counter;
+  }
+  return null;
 }
 
 /**
