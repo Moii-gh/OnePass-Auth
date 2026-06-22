@@ -46,6 +46,12 @@
           <line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
       </button>
+      <button id="btn-toggle-settings" class="header__btn" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -104,6 +110,68 @@
       <div class="qr-preview__actions">
         <button id="btn-qr-confirm" class="qr-preview__btn qr-preview__btn--confirm">Confirm & Save</button>
         <button id="btn-qr-cancel" class="qr-preview__btn qr-preview__btn--cancel">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Settings panel ───────── -->
+  <section id="settings-panel" class="settings-panel settings-panel--hidden">
+    <div class="form-title">Settings</div>
+    
+    <!-- Theme Settings -->
+    <div class="settings-group">
+      <label class="settings-label">Theme Accent Color</label>
+      <div class="color-picker">
+        <button class="color-dot color-dot--white color-dot--active" data-color="white" title="White"></button>
+        <button class="color-dot color-dot--green" data-color="green" title="Green"></button>
+        <button class="color-dot color-dot--blue" data-color="blue" title="Blue"></button>
+        <button class="color-dot color-dot--purple" data-color="purple" title="Purple"></button>
+        <button class="color-dot color-dot--orange" data-color="orange" title="Orange"></button>
+      </div>
+    </div>
+
+    <!-- Security/Privacy Settings -->
+    <div class="settings-group">
+      <div class="settings-option-wrapper">
+        <label class="settings-option">
+          <span class="settings-option__text">Privacy Mode (Hide codes)</span>
+          <input type="checkbox" id="setting-privacy" class="settings-checkbox" />
+        </label>
+      </div>
+      <div class="settings-option-wrapper">
+        <label class="settings-option">
+          <span class="settings-option__text">Auto-Clear Clipboard</span>
+          <select id="setting-clear-clipboard" class="settings-select">
+            <option value="0">Never</option>
+            <option value="10">After 10 seconds</option>
+            <option value="30" selected>After 30 seconds</option>
+            <option value="60">After 60 seconds</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <!-- Backup / Import settings -->
+    <div class="settings-group">
+      <label class="settings-label">Data Backup</label>
+      <div class="settings-actions">
+        <button id="btn-backup-export" class="settings-btn settings-btn--primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Export
+        </button>
+        <button id="btn-backup-import-trigger" class="settings-btn settings-btn--secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Import
+        </button>
+        <input type="file" id="input-backup-file" accept=".json" style="display: none;" />
       </div>
     </div>
   </section>
