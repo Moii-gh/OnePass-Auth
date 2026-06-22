@@ -53,6 +53,10 @@ const $btnBackupExport = document.getElementById("btn-backup-export");
 const $btnBackupImportTrigger = document.getElementById("btn-backup-import-trigger");
 const $inputBackupFile = document.getElementById("input-backup-file");
 
+// Search elements references
+const $inputSearch    = document.getElementById("input-search");
+const $btnSearchClear = document.getElementById("btn-search-clear");
+
 /* ================================================================
    Toast
    ================================================================ */
@@ -438,10 +442,10 @@ async function renderAccounts() {
         <div class="${codeClass}" data-code>${escapeHtml(code)}</div>
       </div>
       <div class="card__right">
-        <div class="card__timer">
+        <div class="${secs <= 5 ? 'card__timer card__timer--danger' : secs <= 10 ? 'card__timer card__timer--warn' : 'card__timer'}">
           <svg viewBox="0 0 36 36">
             <circle class="card__timer-bg" cx="18" cy="18" r="14"/>
-            <circle class="card__timer-fg ${secs <= 5 ? 'card__timer-fg--warn' : ''}"
+            <circle class="card__timer-fg"
                     cx="18" cy="18" r="14"
                     stroke-dasharray="${TIMER_CIRCUMFERENCE}"
                     stroke-dashoffset="${dashoffset}"
@@ -578,13 +582,22 @@ async function tick() {
     const ring = card.querySelector("[data-timer-ring]");
     if (ring) {
       ring.setAttribute("stroke-dashoffset", dashoffset);
-      if (secs <= 5) ring.classList.add("card__timer-fg--warn");
-      else ring.classList.remove("card__timer-fg--warn");
     }
 
     const txt = card.querySelector("[data-timer-text]");
     if (txt) {
       txt.textContent = secs;
+    }
+
+    const timerContainer = card.querySelector("[class*='card__timer']");
+    if (timerContainer) {
+      if (secs <= 5) {
+        timerContainer.className = "card__timer card__timer--danger";
+      } else if (secs <= 10) {
+        timerContainer.className = "card__timer card__timer--warn";
+      } else {
+        timerContainer.className = "card__timer";
+      }
     }
 
     if (secs === period) {
@@ -846,6 +859,260 @@ $inputBackupFile.addEventListener("change", async (e) => {
   }
   $inputBackupFile.value = "";
 });
+
+/* ================================================================
+   Search Bar Filtering Logic
+   ================================================================ */
+$inputSearch.addEventListener("input", () => {
+  const query = $inputSearch.value.trim().toLowerCase();
+  
+  if (query) {
+    $btnSearchClear.classList.remove("search-bar__clear--hidden");
+  } else {
+    $btnSearchClear.classList.add("search-bar__clear--hidden");
+  }
+
+  filterAccounts(query);
+});
+
+$btnSearchClear.addEventListener("click", () => {
+  $inputSearch.value = "";
+  $btnSearchClear.classList.add("search-bar__clear--hidden");
+  filterAccounts("");
+  $inputSearch.focus();
+});
+
+function filterAccounts(query) {
+  const cards = document.querySelectorAll(".card");
+  cards.forEach((card) => {
+    const service = (card.querySelector(".card__service")?.textContent || "").toLowerCase();
+    const login = (card.querySelector(".card__login")?.textContent || "").toLowerCase();
+    
+    if (service.includes(query) || login.includes(query)) {
+      card.style.display = "";
+    } else {
+      card.style.display = "none";
+    }
+  });
+}
+
+/* ================================================================
+   Horizontal Scroll on Hover for Long Texts
+   ================================================================ */
+let activeScrollIntervals = new Map();
+
+function startHorizontalScroll(element) {
+  stopHorizontalScroll(element);
+  const limit = element.scrollWidth - element.clientWidth;
+  if (limit <= 0) return;
+
+  let dir = 1;
+  let pauseTicks = 0;
+
+  const interval = setInterval(() => {
+    if (pauseTicks > 0) {
+      pauseTicks--;
+      return;
+    }
+
+    if (dir === 1) {
+      element.scrollLeft += 1;
+      if (element.scrollLeft >= limit) {
+        dir = -1;
+        pauseTicks = 40; // Approx 1s pause
+      }
+    } else {
+      element.scrollLeft -= 1;
+      if (element.scrollLeft <= 0) {
+        dir = 1;
+        pauseTicks = 40;
+      }
+    }
+  }, 25);
+
+  activeScrollIntervals.set(element, interval);
+}
+
+function stopHorizontalScroll(element) {
+  if (activeScrollIntervals.has(element)) {
+    clearInterval(activeScrollIntervals.get(element));
+    activeScrollIntervals.delete(element);
+  }
+  element.scrollTo({ left: 0, behavior: "smooth" });
+}
+
+$accounts.addEventListener("mouseenter", (e) => {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  const meta = card.querySelector(".card__meta");
+  if (meta) startHorizontalScroll(meta);
+}, true);
+
+$accounts.addEventListener("mouseleave", (e) => {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  const meta = card.querySelector(".card__meta");
+  if (meta) stopHorizontalScroll(meta);
+}, true);
+
+/* ================================================================
+   Drag & Drop holding reordering
+   ================================================================ */
+let dragTimeout = null;
+let isDragging = false;
+let dragEl = null;
+let startClientY = 0;
+let originalIndex = -1;
+
+$accounts.addEventListener("mousedown", onDragStart);
+$accounts.addEventListener("touchstart", onDragStart, { passive: false });
+
+function onDragStart(e) {
+  if (e.type === "mousedown" && e.button !== 0) return;
+  
+  const card = e.target.closest(".card");
+  if (!card) return;
+
+  if (e.target.closest(".card__timer") || e.target.closest(".card__actions") || e.target.closest(".context-menu")) return;
+
+  const clientY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
+  const clientX = e.type === "touchstart" ? e.touches[0].clientX : e.clientX;
+
+  dragTimeout = setTimeout(() => {
+    startDrag(card, clientY, clientX);
+  }, 250); // 250ms hold
+
+  const cancelDragHold = () => {
+    clearTimeout(dragTimeout);
+    document.removeEventListener("mouseup", cancelDragHold);
+    document.removeEventListener("touchend", cancelDragHold);
+    document.removeEventListener("mousemove", checkMoveBeforeHold);
+    document.removeEventListener("touchmove", checkMoveBeforeHold);
+  };
+
+  const checkMoveBeforeHold = (event) => {
+    const currentY = event.type === "touchmove" ? event.touches[0].clientY : event.clientY;
+    const currentX = event.type === "touchmove" ? event.touches[0].clientX : event.clientX;
+    if (Math.abs(currentY - clientY) > 5 || Math.abs(currentX - clientX) > 5) {
+      clearTimeout(dragTimeout);
+    }
+  };
+
+  document.addEventListener("mouseup", cancelDragHold);
+  document.addEventListener("touchend", cancelDragHold);
+  document.addEventListener("mousemove", checkMoveBeforeHold);
+  document.addEventListener("touchmove", checkMoveBeforeHold);
+}
+
+function startDrag(card, clientY, clientX) {
+  isDragging = true;
+  dragEl = card;
+  startClientY = clientY;
+  originalIndex = Array.from($accounts.children).indexOf(card);
+
+  dragEl.classList.add("card--dragging");
+  dragEl.style.transform = "scale(1.03)";
+
+  if (navigator.vibrate) {
+    navigator.vibrate(50);
+  }
+
+  if (clientX === undefined) {
+    document.addEventListener("touchmove", onDragMove, { passive: false });
+    document.addEventListener("touchend", onDragEnd);
+  } else {
+    document.addEventListener("mousemove", onDragMove);
+    document.addEventListener("mouseup", onDragEnd);
+  }
+}
+
+function onDragMove(e) {
+  if (!isDragging || !dragEl) return;
+  if (e.cancelable) e.preventDefault();
+
+  const clientY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
+  const deltaY = clientY - startClientY;
+
+  dragEl.style.transform = `translateY(${deltaY}px) scale(1.03)`;
+
+  const rect = dragEl.getBoundingClientRect();
+  const dragCenterY = rect.top + rect.height / 2;
+  const dragCenterX = rect.left + rect.width / 2;
+
+  dragEl.style.visibility = "hidden";
+  const elemBelow = document.elementFromPoint(dragCenterX, dragCenterY);
+  dragEl.style.visibility = "visible";
+
+  if (!elemBelow) return;
+  const targetCard = elemBelow.closest(".card");
+
+  if (targetCard && targetCard !== dragEl) {
+    const targetRect = targetCard.getBoundingClientRect();
+    const targetCenterY = targetRect.top + targetRect.height / 2;
+
+    if (clientY > targetCenterY && dragEl.nextElementSibling === targetCard) {
+      animateReorder($accounts, dragEl, targetCard.nextElementSibling);
+      startClientY = clientY;
+      dragEl.style.transform = "translateY(0px) scale(1.03)";
+    } else if (clientY < targetCenterY && dragEl.previousElementSibling === targetCard) {
+      animateReorder($accounts, dragEl, targetCard);
+      startClientY = clientY;
+      dragEl.style.transform = "translateY(0px) scale(1.03)";
+    }
+  }
+}
+
+async function onDragEnd() {
+  if (!isDragging) return;
+  isDragging = false;
+
+  document.removeEventListener("mousemove", onDragMove);
+  document.removeEventListener("mouseup", onDragEnd);
+  document.removeEventListener("touchmove", onDragMove);
+  document.removeEventListener("touchend", onDragEnd);
+
+  dragEl.classList.remove("card--dragging");
+  dragEl.style.transform = "";
+  
+  const finalIndex = Array.from($accounts.children).indexOf(dragEl);
+  if (finalIndex !== originalIndex) {
+    await reorderAccountsInStorage(originalIndex, finalIndex);
+    showToast("Порядок аккаунтов изменен");
+  }
+
+  dragEl = null;
+}
+
+function animateReorder(parent, dragging, beforeNode) {
+  const children = Array.from(parent.children).filter(c => c !== dragging);
+  
+  const firstPositions = children.map(c => ({
+    el: c,
+    rect: c.getBoundingClientRect()
+  }));
+
+  parent.insertBefore(dragging, beforeNode);
+
+  firstPositions.forEach(pos => {
+    const lastRect = pos.el.getBoundingClientRect();
+    const invertY = pos.rect.top - lastRect.top;
+    
+    if (invertY !== 0) {
+      pos.el.style.transition = 'none';
+      pos.el.style.transform = `translateY(${invertY}px)`;
+      pos.el.offsetHeight;
+      pos.el.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      pos.el.style.transform = 'translateY(0)';
+    }
+  });
+}
+
+async function reorderAccountsInStorage(fromIndex, fromTargetIndex) {
+  const accounts = await loadAccounts();
+  const moved = accounts.splice(fromIndex, 1)[0];
+  accounts.splice(fromTargetIndex, 0, moved);
+  await saveAccounts(accounts);
+}
 
 /* ================================================================
    Boot
