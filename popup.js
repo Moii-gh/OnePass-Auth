@@ -783,8 +783,8 @@ async function populateSettingsUI() {
   $settingPrivacy.checked = appSettings.privacyMode;
   $settingClearClipboard.value = appSettings.clearClipboardSec.toString();
   $settingThemeMode.value = appSettings.themeMode;
-  applyAccentColor(appSettings.accentColor, $colorDots);
   applyThemeMode(appSettings.themeMode);
+  applyAccentColor(appSettings.accentColor, $colorDots, appSettings.themeMode);
   
   const isPinSet = await hasPinSet();
   $settingPinLock.checked = isPinSet;
@@ -812,7 +812,7 @@ $colorDots.forEach(dot => {
   dot.addEventListener("click", async () => {
     const color = dot.dataset.color;
     appSettings.accentColor = color;
-    applyAccentColor(color, $colorDots);
+    applyAccentColor(color, $colorDots, appSettings.themeMode);
     await saveAppSettings();
     showToast("toast_accent_updated");
   });
@@ -838,6 +838,7 @@ $settingThemeMode.addEventListener("change", async (e) => {
   const selectedTheme = e.target.value;
   appSettings.themeMode = selectedTheme;
   applyThemeMode(selectedTheme);
+  applyAccentColor(appSettings.accentColor, $colorDots, selectedTheme);
   await saveAppSettings();
 });
 

@@ -62,7 +62,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 24px 18px;
+  padding: 16px 20px 12px;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -72,26 +72,30 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .header__brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 .header__icon {
   width: 28px;
   height: 28px;
   color: var(--accent);
+  flex-shrink: 0;
 }
 .header__title {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: -.5px;
   color: #ffffff;
 }
 .header__actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .header__btn {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
@@ -100,8 +104,9 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   color: var(--text-secondary);
   cursor: pointer;
   transition: all .2s;
+  outline: none;
 }
-.header__btn svg { width: 20px; height: 20px; }
+.header__btn svg { width: 18px; height: 18px; }
 .header__btn:hover {
   color: var(--accent);
   border-color: var(--accent);
@@ -168,7 +173,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   font-family: inherit;
   font-size: 15px;
   font-weight: 600;
-  color: #000000;
+  color: var(--accent-text);
   background: var(--accent);
   border: none;
   border-radius: 24px;
@@ -221,7 +226,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 
 .qr-panel__btn-action--primary {
   background: var(--accent);
-  color: #000000;
+  color: var(--accent-text);
 }
 .qr-panel__btn-action--primary:hover {
   background: var(--accent-hover);
@@ -813,7 +818,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 .settings-btn--primary {
   background: var(--accent);
-  color: #000000;
+  color: var(--accent-text);
 }
 .settings-btn--primary:hover {
   background: var(--accent-hover);
@@ -968,7 +973,7 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 .category-chip--active {
   background: var(--accent) !important;
-  color: #000000 !important;
+  color: var(--accent-text) !important;
   border-color: var(--accent) !important;
 }
 
@@ -1123,5 +1128,25 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 .theme-light .numpad-btn:hover {
   background: #f9fafb;
+}
+
+/* Light Theme Header Button Overrides */
+.theme-light .header__btn--active {
+  background: var(--accent) !important;
+  color: var(--accent-text) !important;
+  border-color: var(--accent) !important;
+}
+.theme-light .header__btn:hover {
+  background: var(--accent) !important;
+  color: var(--accent-text) !important;
+  border-color: var(--accent) !important;
+}
+
+/* Light Theme Settings Accent Color Dot Overrides */
+.theme-light .color-dot--white {
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+}
+.theme-light .color-dot--active {
+  border-color: #111827 !important;
 }
 

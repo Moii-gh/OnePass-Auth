@@ -3,18 +3,25 @@
  */
 
 const ACCENT_COLOR_MAP = {
-  white: { accent: "#ffffff", hover: "#e0e0e0", glow: "rgba(255, 255, 255, 0.12)" },
-  green: { accent: "#3ecf8e", hover: "#4de09e", glow: "rgba(62, 207, 142, 0.12)" },
-  blue: { accent: "#1a73e8", hover: "#3b82f6", glow: "rgba(26, 115, 232, 0.12)" },
-  purple: { accent: "#a855f7", hover: "#c084fc", glow: "rgba(168, 85, 247, 0.12)" },
-  orange: { accent: "#f97316", hover: "#fb923c", glow: "rgba(249, 115, 22, 0.12)" }
+  white: { accent: "#ffffff", hover: "#e0e0e0", glow: "rgba(255, 255, 255, 0.12)", text: "#000000" },
+  green: { accent: "#3ecf8e", hover: "#4de09e", glow: "rgba(62, 207, 142, 0.12)", text: "#000000" },
+  blue: { accent: "#1a73e8", hover: "#3b82f6", glow: "rgba(26, 115, 232, 0.12)", text: "#ffffff" },
+  purple: { accent: "#a855f7", hover: "#c084fc", glow: "rgba(168, 85, 247, 0.12)", text: "#ffffff" },
+  orange: { accent: "#f97316", hover: "#fb923c", glow: "rgba(249, 115, 22, 0.12)", text: "#ffffff" }
 };
 
-export function applyAccentColor(colorName, dotsList) {
-  const vars = ACCENT_COLOR_MAP[colorName] || ACCENT_COLOR_MAP.white;
+export function applyAccentColor(colorName, dotsList, themeMode) {
+  let vars = ACCENT_COLOR_MAP[colorName] || ACCENT_COLOR_MAP.white;
+  
+  if (themeMode === "light" && colorName === "white") {
+    // In light theme, the default "white" accent color maps to a premium dark slate
+    vars = { accent: "#111827", hover: "#1f2937", glow: "rgba(17, 24, 39, 0.08)", text: "#ffffff" };
+  }
+
   document.documentElement.style.setProperty("--accent", vars.accent);
   document.documentElement.style.setProperty("--accent-hover", vars.hover);
   document.documentElement.style.setProperty("--accent-glow", vars.glow);
+  document.documentElement.style.setProperty("--accent-text", vars.text);
 
   dotsList.forEach(dot => {
     if (dot.dataset.color === colorName) {

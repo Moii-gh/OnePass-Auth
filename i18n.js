@@ -1,6 +1,6 @@
 /**
  * i18n.js - Helper to translate UI elements using data-i18n attributes and localized messages.
- * Includes a robust English fallback map to prevent blank UI text.
+ * Separates tag text translations from attribute tooltips to protect SVG structures.
  */
 
 const FALLBACK_MAP = {
@@ -54,6 +54,13 @@ const FALLBACK_MAP = {
   "category_other": "Other",
   "category_none": "No category",
   
+  // Tooltip descriptions
+  "panel_title_qr_title": "Import from QR",
+  "panel_title_manual_title": "Add account manually",
+  "panel_title_settings_title": "Settings",
+  "btn_scan_screen_title": "Scan QR directly from current page/tab screen",
+  "btn_paste_image_title": "Paste QR image from clipboard",
+  
   // Toast translations fallbacks
   "toast_fill_fields": "Please fill all fields correctly",
   "toast_invalid_base32": "Invalid Base32 secret key",
@@ -101,6 +108,7 @@ const FALLBACK_MAP = {
 };
 
 export function initTranslations() {
+  // 1. Translate elements with data-i18n (text content / value / placeholders)
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.getAttribute("data-i18n");
     const msg = getTranslation(key);
@@ -112,23 +120,19 @@ export function initTranslations() {
       } else {
         el.value = msg;
       }
-    } else if (el.tagName === "BUTTON" && el.hasAttribute("title")) {
-      el.setAttribute("title", msg);
     } else {
-      let textNode = Array.from(el.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
-      if (textNode) {
-        textNode.nodeValue = msg;
-      } else if (el.children.length === 0) {
-        el.textContent = msg;
-      }
+      // Safe replacement: since text is isolated in its own tag (like span or option),
+      // we can safely set textContent without losing any SVG siblings!
+      el.textContent = msg;
     }
-    
-    if (el.hasAttribute("title")) {
-      const titleKey = el.getAttribute("data-i18n-title") || key + "_title";
-      const titleMsg = getTranslation(titleKey);
-      if (titleMsg) {
-        el.setAttribute("title", titleMsg);
-      }
+  });
+
+  // 2. Translate tooltips independently
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-title");
+    const msg = getTranslation(key);
+    if (msg) {
+      el.setAttribute("title", msg);
     }
   });
 }
