@@ -885,3 +885,24 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 .search-bar__clear--hidden {
   display: none;
 }
+
+/* Custom wiggle/shake animation for Move Mode */
+@keyframes wiggle {
+  0% { transform: rotate(0.6deg); }
+  50% { transform: rotate(-0.6deg); }
+  100% { transform: rotate(0.6deg); }
+}
+
+.accounts--reordering .card:not(.card--reordering) {
+  animation: wiggle 0.28s ease-in-out infinite;
+  opacity: 0.6;
+}
+
+.card--reordering {
+  border-color: var(--accent) !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.5) !important;
+  transform: scale(1.02);
+  z-index: 100 !important;
+  cursor: grabbing !important;
+  pointer-events: none !important; /* allow mousemove collision detection below it */
+}

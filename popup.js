@@ -40,6 +40,7 @@ const $btnQrCancel  = document.getElementById("btn-qr-cancel");
 // Context menu references
 const $contextMenu = document.getElementById("context-menu");
 const $ctxCopy     = document.getElementById("ctx-copy");
+const $ctxMove     = document.getElementById("ctx-move");
 const $ctxDelete   = document.getElementById("ctx-delete");
 let activeCardId   = null;
 
@@ -545,6 +546,20 @@ $ctxCopy.addEventListener("click", async (e) => {
     }
   }
   $contextMenu.classList.add("context-menu--hidden");
+});
+
+$ctxMove.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  $contextMenu.classList.add("context-menu--hidden");
+  if (!activeCardId) return;
+
+  const card = document.querySelector(`.card[data-id="${activeCardId}"]`);
+  if (card) {
+    setTimeout(() => {
+      startReorderMode(card);
+    }, 50);
+  }
 });
 
 $ctxDelete.addEventListener("click", (e) => {
@@ -1112,6 +1127,122 @@ async function reorderAccountsInStorage(fromIndex, fromTargetIndex) {
   const moved = accounts.splice(fromIndex, 1)[0];
   accounts.splice(fromTargetIndex, 0, moved);
   await saveAccounts(accounts);
+}
+
+/* ================================================================
+   Move Mode (Keyboard & Mouse Hover Reordering)
+   ================================================================ */
+let isReorderingMode = false;
+let reorderEl = null;
+let reorderStartClientY = null;
+let reorderOriginalIndex = -1;
+
+function startReorderMode(card) {
+  if (isReorderingMode) return;
+  isReorderingMode = true;
+  reorderEl = card;
+  reorderStartClientY = null;
+  reorderOriginalIndex = Array.from($accounts.children).indexOf(card);
+
+  $accounts.classList.add("accounts--reordering");
+  reorderEl.classList.add("card--reordering");
+
+  document.addEventListener("mousemove", onReorderMouseMove);
+  document.addEventListener("keydown", onReorderKeyDown);
+  document.addEventListener("click", onReorderClick, { capture: true });
+
+  showToast("Режим перемещения. Стрелки ↑/↓ или ведение мыши.", "success");
+}
+
+async function stopReorderMode() {
+  if (!isReorderingMode) return;
+  isReorderingMode = false;
+
+  document.removeEventListener("mousemove", onReorderMouseMove);
+  document.removeEventListener("keydown", onReorderKeyDown);
+  document.removeEventListener("click", onReorderClick, { capture: true });
+
+  $accounts.classList.remove("accounts--reordering");
+  if (reorderEl) {
+    reorderEl.classList.remove("card--reordering");
+    reorderEl.style.transform = "";
+  }
+
+  const finalIndex = Array.from($accounts.children).indexOf(reorderEl);
+  if (finalIndex !== reorderOriginalIndex) {
+    await reorderAccountsInStorage(reorderOriginalIndex, finalIndex);
+    showToast("Порядок аккаунтов сохранен");
+  }
+
+  reorderEl = null;
+  reorderStartClientY = null;
+}
+
+function onReorderMouseMove(e) {
+  if (!isReorderingMode || !reorderEl) return;
+  if (reorderStartClientY === null) {
+    reorderStartClientY = e.clientY;
+  }
+
+  const deltaY = e.clientY - reorderStartClientY;
+  reorderEl.style.transform = `translateY(${deltaY}px) scale(1.02)`;
+
+  const rect = reorderEl.getBoundingClientRect();
+  const centerY = rect.top + rect.height / 2;
+  const centerX = rect.left + rect.width / 2;
+
+  reorderEl.style.visibility = "hidden";
+  const elemBelow = document.elementFromPoint(centerX, centerY);
+  reorderEl.style.visibility = "visible";
+
+  if (!elemBelow) return;
+  const targetCard = elemBelow.closest(".card");
+
+  if (targetCard && targetCard !== reorderEl) {
+    const targetRect = targetCard.getBoundingClientRect();
+    const targetCenterY = targetRect.top + targetRect.height / 2;
+
+    if (e.clientY > targetCenterY && reorderEl.nextElementSibling === targetCard) {
+      animateReorder($accounts, reorderEl, targetCard.nextElementSibling);
+      reorderStartClientY = e.clientY;
+      reorderEl.style.transform = "translateY(0px) scale(1.02)";
+    } else if (e.clientY < targetCenterY && reorderEl.previousElementSibling === targetCard) {
+      animateReorder($accounts, reorderEl, targetCard);
+      reorderStartClientY = e.clientY;
+      reorderEl.style.transform = "translateY(0px) scale(1.02)";
+    }
+  }
+}
+
+function onReorderKeyDown(e) {
+  if (!isReorderingMode || !reorderEl) return;
+
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    const prev = reorderEl.previousElementSibling;
+    if (prev && prev.classList.contains("card")) {
+      animateReorder($accounts, reorderEl, prev);
+      reorderStartClientY = null;
+      reorderEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  } else if (e.key === "ArrowDown") {
+    e.preventDefault();
+    const next = reorderEl.nextElementSibling;
+    if (next && next.classList.contains("card")) {
+      animateReorder($accounts, reorderEl, next.nextElementSibling);
+      reorderStartClientY = null;
+      reorderEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  } else if (e.key === "Enter" || e.key === "Escape") {
+    e.preventDefault();
+    stopReorderMode();
+  }
+}
+
+function onReorderClick(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  stopReorderMode();
 }
 
 /* ================================================================
