@@ -10,10 +10,21 @@
   <!-- ───────── Header ───────── -->
   <header class="header">
     <div class="header__brand">
-      <svg class="header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="7.5" cy="15.5" r="5.5"/>
-        <path d="m21 2-9.6 9.6"/>
-        <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+      <svg class="header__icon" viewBox="0 0 24 24" fill="none" style="width:24px; height:24px;">
+        <!-- Left: Green -->
+        <line x1="12" y1="12" x2="5.5" y2="12" stroke="#34a853" stroke-width="3.2" stroke-linecap="round" />
+        <!-- Top-Left: Yellow -->
+        <line x1="12" y1="12" x2="8.75" y2="6.37" stroke="#fbbc05" stroke-width="3.2" stroke-linecap="round" />
+        <!-- Bottom-Left: Red -->
+        <line x1="12" y1="12" x2="8.75" y2="17.63" stroke="#ea4335" stroke-width="3.2" stroke-linecap="round" />
+        <!-- Bottom-Right: Red -->
+        <line x1="12" y1="12" x2="15.25" y2="17.63" stroke="#ea4335" stroke-width="3.2" stroke-linecap="round" />
+        <!-- Right: Blue -->
+        <line x1="12" y1="12" x2="18.5" y2="12" stroke="#1a73e8" stroke-width="3.2" stroke-linecap="round" />
+        <!-- Top-Right: Blue -->
+        <line x1="12" y1="12" x2="15.25" y2="6.37" stroke="#1a73e8" stroke-width="3.2" stroke-linecap="round" />
+        <!-- Central overlap in Blue -->
+        <circle cx="12" cy="12" r="1.6" fill="#1a73e8" />
       </svg>
       <h1 class="header__title">OnePass Auth</h1>
     </div>
