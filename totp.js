@@ -17,7 +17,7 @@ const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 /**
  * Validate that a string is legal Base32 (RFC 4648).
  */
-function isValidBase32(str) {
+export function isValidBase32(str) {
   if (!str || str.length === 0) return false;
   const cleaned = str.replace(/[\s=-]/g, "").toUpperCase();
   return /^[A-Z2-7]+$/.test(cleaned);
@@ -26,7 +26,7 @@ function isValidBase32(str) {
 /**
  * Decode a Base32 string into a Uint8Array.
  */
-function base32ToBytes(base32) {
+export function base32ToBytes(base32) {
   const cleaned = base32.replace(/[\s=-]/g, "").toUpperCase();
   let bits = "";
   for (const ch of cleaned) {
@@ -47,13 +47,8 @@ function base32ToBytes(base32) {
 
 /**
  * Generate the current TOTP code for a given secret (plaintext Base32).
- * @param {string} secretBase32 – the raw Base32-encoded secret
- * @param {number} period – update period in seconds
- * @param {number} digits – code length
- * @param {string} algorithm – HMAC hash algorithm (SHA-1, SHA-256, SHA-512)
- * @returns {Promise<string>} digits-digit zero-padded code
  */
-async function generateTOTP(secretBase32, period = DEFAULT_TOTP_PERIOD, digits = DEFAULT_TOTP_DIGITS, algorithm = DEFAULT_TOTP_ALGO) {
+export async function generateTOTP(secretBase32, period = DEFAULT_TOTP_PERIOD, digits = DEFAULT_TOTP_DIGITS, algorithm = DEFAULT_TOTP_ALGO) {
   const keyBytes = base32ToBytes(secretBase32);
   const epoch = Math.floor(Date.now() / 1000);
   const counter = Math.floor(epoch / period);
@@ -61,14 +56,11 @@ async function generateTOTP(secretBase32, period = DEFAULT_TOTP_PERIOD, digits =
   // Convert counter to 8-byte big-endian buffer
   const counterBuf = new ArrayBuffer(8);
   const view = new DataView(counterBuf);
-  // Write counter as 64-bit integer
-  // JavaScript numbers are double precision floats, safe up to 2^53 - 1
   const high = Math.floor(counter / 0x100000000);
   const low = counter % 0x100000000;
   view.setUint32(0, high, false);
   view.setUint32(4, low, false);
 
-  // Normalize Web Crypto algorithm hash format (e.g. SHA1 -> SHA-1)
   let hashName = algorithm.toUpperCase();
   if (hashName === "SHA1") hashName = "SHA-1";
   if (hashName === "SHA256") hashName = "SHA-256";
@@ -99,21 +91,15 @@ async function generateTOTP(secretBase32, period = DEFAULT_TOTP_PERIOD, digits =
 
 /**
  * Seconds remaining until the next TOTP refresh.
- * @param {number} period
  */
-function secondsRemaining(period = DEFAULT_TOTP_PERIOD) {
+export function secondsRemaining(period = DEFAULT_TOTP_PERIOD) {
   return period - (Math.floor(Date.now() / 1000) % period);
 }
 
 /**
  * Generate a HOTP code for a given secret and counter (RFC 4226).
- * @param {string} secretBase32 – the raw Base32-encoded secret
- * @param {number} counter – the HOTP counter value
- * @param {number} digits – code length
- * @param {string} algorithm – HMAC hash algorithm
- * @returns {Promise<string>} digits-digit zero-padded code
  */
-async function generateHOTP(secretBase32, counter, digits = DEFAULT_TOTP_DIGITS, algorithm = DEFAULT_TOTP_ALGO) {
+export async function generateHOTP(secretBase32, counter, digits = DEFAULT_TOTP_DIGITS, algorithm = DEFAULT_TOTP_ALGO) {
   const keyBytes = base32ToBytes(secretBase32);
 
   // Convert counter to 8-byte big-endian buffer
@@ -151,3 +137,4 @@ async function generateHOTP(secretBase32, counter, digits = DEFAULT_TOTP_DIGITS,
   const otp = binary % Math.pow(10, digits);
   return otp.toString().padStart(digits, "0");
 }
+

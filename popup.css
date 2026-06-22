@@ -934,3 +934,194 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   transform: scale(1.02);
   z-index: 100 !important;
 }
+
+/* ---------- Categories Chips ---------- */
+.categories-bar {
+  padding: 0 24px 10px;
+  background: var(--bg-base);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.categories-bar::-webkit-scrollbar {
+  display: none;
+}
+.categories-bar__wrapper {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+.category-chip {
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all .2s;
+}
+.category-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+.category-chip--active {
+  background: var(--accent) !important;
+  color: #000000 !important;
+  border-color: var(--accent) !important;
+}
+
+/* ---------- Category Form Select ---------- */
+.add-form__select {
+  height: 48px;
+  padding: 0 22px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%238b92a5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='feather feather-chevron-down' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
+  background-size: 16px;
+}
+.add-form__select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ---------- PIN Lock Overlay ---------- */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: var(--bg-base);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.2s ease-out;
+}
+.lock-screen--hidden {
+  display: none !important;
+}
+.lock-screen__logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.lock-screen__title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 8px;
+  margin-bottom: 24px;
+  color: var(--text-primary);
+  text-align: center;
+}
+.lock-screen__dots {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.lock-screen__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--text-muted);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.lock-screen__dot--filled {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+.lock-screen__numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 70px);
+  gap: 16px;
+  justify-content: center;
+}
+.numpad-btn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.numpad-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-secondary);
+}
+.numpad-btn:active {
+  transform: scale(0.92);
+}
+.numpad-btn--clear,
+.numpad-btn--cancel {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.numpad-btn--delete {
+  color: var(--text-secondary);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+.lock-screen--shake {
+  animation: shake 0.25s ease-in-out;
+}
+
+/* ---------- Light Theme Overrides ---------- */
+.theme-light {
+  --bg-base:        #f3f4f6;
+  --bg-card:        #ffffff;
+  --bg-card-hover:  #f9fafb;
+  --bg-input:       #e5e7eb;
+  --bg-form:        #ffffff;
+  
+  --text-primary:   #111827;
+  --text-secondary: #4b5563;
+  --text-muted:     #9ca3af;
+  
+  --border:         rgba(0, 0, 0, 0.08);
+  --shadow-card:    0 4px 16px rgba(0, 0, 0, 0.05);
+}
+.theme-light .header {
+  background: #ffffff;
+}
+.theme-light .header__title {
+  color: #000000 !important;
+}
+.theme-light .card__code {
+  color: #000000 !important;
+}
+.theme-light .card__timer-bg {
+  stroke: rgba(0, 0, 0, 0.05);
+}
+.theme-light .settings-checkbox {
+  background: var(--bg-input);
+}
+.theme-light .numpad-btn {
+  background: #ffffff;
+}
+.theme-light .numpad-btn:hover {
+  background: #f9fafb;
+}
+

@@ -1,14 +1,37 @@
 /**
- * popup.js – Main controller for the Authenticator popup UI.
- *
- * Responsibilities:
- *  • Render account cards with live TOTP codes (supports dynamic digits, periods, and SHA algorithms)
- *  • Run a per-account 1 s tick loop for timer rings + code refresh
- *  • Handle manual add & QR code import (single standard codes and multiple Google migration codes)
- *  • Support scanning QR from active screen capture, clipboard pastes, or file uploads
- *  • Handle delete / copy actions using robust Event Delegation and Clipboard APIs
- *  • Toast notifications for feedback
+ * popup.js – Main modular controller for OnePass Auth extension.
  */
+
+import { 
+  decryptSecret, encryptSecret, isLocked, unlockKey, setupPin, removePin, clearInMemoryKey, hasPinSet 
+} from './crypto.js';
+import { 
+  generateTOTP, generateHOTP, secondsRemaining 
+} from './totp.js';
+import { 
+  loadAccounts, addAccount, updateAccount, incrementCounter, removeAccount 
+} from './storage.js';
+import { 
+  parseOtpauthUrl 
+} from './qr.js';
+import { 
+  isValidBase32 
+} from './totp.js';
+import { 
+  initTranslations, getTranslation 
+} from './i18n.js';
+import { 
+  initDragAndDrop, startReorderMode 
+} from './drag-drop.js';
+import { 
+  exportBackup, importBackup 
+} from './backup.js';
+import { 
+  scanFromFile, scanFromScreen, scanFromClipboard 
+} from './qr-scanner.js';
+import { 
+  applyAccentColor, applyThemeMode, startHorizontalScroll, stopHorizontalScroll 
+} from './ui.js';
 
 /* ================================================================
    DOM references
@@ -16,20 +39,23 @@
 const $toggleForm = document.getElementById("btn-toggle-form");
 const $toggleQr   = document.getElementById("btn-toggle-qr");
 const $addForm    = document.getElementById("add-form");
+const $addFormTitle = document.getElementById("add-form-title");
 const $qrPanel    = document.getElementById("qr-panel");
 const $accounts   = document.getElementById("accounts");
 const $empty      = document.getElementById("empty-state");
 const $toast      = document.getElementById("toast");
 
 // Manual form inputs
-const $inputSvc   = document.getElementById("input-service");
-const $inputLogin = document.getElementById("input-login");
-const $inputKey   = document.getElementById("input-secret");
-const $btnSave    = document.getElementById("btn-save");
+const $inputSvc      = document.getElementById("input-service");
+const $inputLogin    = document.getElementById("input-login");
+const $inputKey      = document.getElementById("input-secret");
+const $selectCategory = document.getElementById("select-category");
+const $btnSave       = document.getElementById("btn-save");
 
-// State for manual account type (can be auto-detected if pasting a full otpauth URL)
+// Form state
 let manualAccountType = "totp";
 let manualAccountCounter = 0;
+let editingId = null; // tracking edit mode
 
 // QR panel components
 const $btnQrScreen  = document.getElementById("btn-qr-screen");
@@ -44,6 +70,7 @@ const $btnQrCancel  = document.getElementById("btn-qr-cancel");
 // Context menu references
 const $contextMenu = document.getElementById("context-menu");
 const $ctxCopy     = document.getElementById("ctx-copy");
+const $ctxEdit     = document.getElementById("ctx-edit");
 const $ctxMove     = document.getElementById("ctx-move");
 const $ctxDelete   = document.getElementById("ctx-delete");
 let activeCardId   = null;
@@ -52,7 +79,9 @@ let activeCardId   = null;
 const $toggleSettings = document.getElementById("btn-toggle-settings");
 const $settingsPanel  = document.getElementById("settings-panel");
 const $colorDots      = document.querySelectorAll(".color-dot");
+const $settingThemeMode = document.getElementById("setting-theme-mode");
 const $settingPrivacy = document.getElementById("setting-privacy");
+const $settingPinLock = document.getElementById("setting-pin-lock");
 const $settingClearClipboard = document.getElementById("setting-clear-clipboard");
 const $btnBackupExport = document.getElementById("btn-backup-export");
 const $btnBackupImportTrigger = document.getElementById("btn-backup-import-trigger");
@@ -62,6 +91,15 @@ const $inputBackupFile = document.getElementById("input-backup-file");
 const $inputSearch    = document.getElementById("input-search");
 const $btnSearchClear = document.getElementById("btn-search-clear");
 
+// Categories chips
+const $categoryChips = document.querySelectorAll(".category-chip");
+let currentCategory = "all";
+
+// Lock screen overlays
+const $lockScreen = document.getElementById("lock-screen");
+const $pinSetupOverlay = document.getElementById("pin-setup-overlay");
+const $btnPinSetupCancel = document.getElementById("btn-pin-setup-cancel");
+
 /* ================================================================
    Toast
    ================================================================ */
@@ -69,7 +107,9 @@ let toastTimer = null;
 
 function showToast(msg, type = "success") {
   clearTimeout(toastTimer);
-  $toast.textContent = msg;
+  // If the message is a localization key, resolve it
+  const translated = getTranslation(msg) || msg;
+  $toast.textContent = translated;
   $toast.className = `toast toast--visible toast--${type}`;
   toastTimer = setTimeout(() => {
     $toast.classList.remove("toast--visible");
@@ -77,7 +117,7 @@ function showToast(msg, type = "success") {
 }
 
 /* ================================================================
-   Robust Clipboard Copying Helper
+   Clipboard Copy Helper
    ================================================================ */
 async function copyToClipboard(text) {
   let success = false;
@@ -91,7 +131,6 @@ async function copyToClipboard(text) {
   }
 
   if (!success) {
-    // Fallback method using temporary textarea
     try {
       const textarea = document.createElement("textarea");
       textarea.value = text;
@@ -111,7 +150,7 @@ async function copyToClipboard(text) {
   }
 
   if (success) {
-    triggerClipboardClearTimer(text);
+    triggerClipboardClearTimer();
   }
   return success;
 }
@@ -135,6 +174,12 @@ function closeAllPanels() {
   $toggleSettings.classList.remove("header__btn--active");
   manualAccountType = "totp";
   manualAccountCounter = 0;
+  
+  // Reset Manual Form Title and button text
+  $addFormTitle.textContent = getTranslation("panel_title_manual");
+  $btnSave.textContent = getTranslation("btn_add_account");
+  editingId = null;
+
   resetQrPreview();
 }
 
@@ -173,7 +218,7 @@ $toggleSettings.addEventListener("click", () => {
 });
 
 /* ================================================================
-   Save handler (Manual)
+   Save handler (Manual / Edit)
    ================================================================ */
 $btnSave.addEventListener("click", async () => {
   [$inputSvc, $inputLogin, $inputKey].forEach((el) =>
@@ -183,6 +228,7 @@ $btnSave.addEventListener("click", async () => {
   const service = $inputSvc.value.trim();
   const login   = $inputLogin.value.trim();
   const secret  = $inputKey.value.trim().replace(/\s+/g, "");
+  const category = $selectCategory.value;
 
   let hasError = false;
   if (!service) { $inputSvc.classList.add("add-form__input--error"); hasError = true; }
@@ -190,29 +236,34 @@ $btnSave.addEventListener("click", async () => {
   if (!secret)  { $inputKey.classList.add("add-form__input--error"); hasError = true; }
 
   if (hasError) {
-    showToast("Заполните все поля корректно", "error");
+    showToast("toast_fill_fields", "error");
     return;
   }
 
   if (!isValidBase32(secret)) {
     $inputKey.classList.add("add-form__input--error");
-    showToast("Некорректный Base32 секретный ключ", "error");
+    showToast("toast_invalid_base32", "error");
     return;
   }
 
   try {
-    await addAccount(service, login, secret, 30, 6, "SHA-1", manualAccountType, manualAccountCounter);
+    if (editingId) {
+      await updateAccount(editingId, service, login, secret, 30, 6, "SHA-1", manualAccountType, manualAccountCounter, category);
+      showToast("toast_code_updated");
+    } else {
+      await addAccount(service, login, secret, 30, 6, "SHA-1", manualAccountType, manualAccountCounter, category);
+      showToast("toast_account_added");
+    }
+    
     $inputSvc.value = "";
     $inputLogin.value = "";
     $inputKey.value = "";
-    manualAccountType = "totp";
-    manualAccountCounter = 0;
+    $selectCategory.value = "none";
     closeAllPanels();
-    showToast("Аккаунт добавлен!");
     await renderAccounts();
   } catch (err) {
     console.error(err);
-    showToast("Ошибка сохранения аккаунта", "error");
+    showToast("toast_save_error", "error");
   }
 });
 
@@ -229,7 +280,7 @@ $inputKey.addEventListener("input", () => {
         $inputKey.value = acc.secret || "";
         manualAccountType = acc.type || "totp";
         manualAccountCounter = acc.counter || 0;
-        showToast("Данные распознаны из ссылки!");
+        showToast("toast_link_parsed");
       }
     } catch (err) {
       console.warn("Failed to auto-parse pasted otpauth URL:", err);
@@ -238,18 +289,11 @@ $inputKey.addEventListener("input", () => {
 });
 
 /* ================================================================
-   QR Import Handlers (File, Screen Capture, Clipboard Paste)
+   QR Import Handlers
    ================================================================ */
 let pendingQrAccounts = [];
 
-// Helper to validate and render QR details
 function handleRecognizedAccounts(accountList) {
-  for (const acc of accountList) {
-    if (!isValidBase32(acc.secret)) {
-      throw new Error(`Секретный ключ для ${acc.service} не является корректным Base32`);
-    }
-  }
-
   pendingQrAccounts = accountList;
   $qrPreviewList.innerHTML = "";
 
@@ -257,7 +301,7 @@ function handleRecognizedAccounts(accountList) {
     const item = document.createElement("div");
     item.className = "qr-preview__detail";
     item.style.marginBottom = "6px";
-    item.style.borderBottom = "1px solid rgba(255,255,255,0.03)";
+    item.style.borderBottom = "1px solid var(--border)";
     item.style.paddingBottom = "4px";
 
     const maskedSecret = acc.secret.slice(0, 6) + "..." + acc.secret.slice(-4);
@@ -281,90 +325,29 @@ function handleRecognizedAccounts(accountList) {
   
   const count = accountList.length;
   const title = document.getElementById("qr-preview-title");
-  title.textContent = count === 1 ? "Recognized Account Info:" : `Recognized Accounts (${count}):`;
+  title.textContent = count === 1 ? getTranslation("qr_preview_title") : `${getTranslation("toast_accounts_found").replace("$1", count)}`;
 
   $qrPreview.classList.remove("qr-preview--hidden");
-  showToast(count === 1 ? "QR-код успешно считан!" : `Найдено аккаунтов для импорта: ${count}`);
-}
-
-// Shared decoder file reader
-async function handleQrFile(fileOrBlob) {
-  try {
-    showToast("Чтение QR-кода...", "success");
-    const accountList = await decodeQrCode(fileOrBlob);
-    handleRecognizedAccounts(accountList);
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Ошибка считывания QR-кода", "error");
-    resetQrPreview();
-  }
+  showToast(count === 1 ? "toast_qr_scanned" : getTranslation("toast_accounts_found").replace("$1", count));
 }
 
 // 1. File Upload Selector
 $qrFileInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (file) {
-    await handleQrFile(file);
+    await scanFromFile(file, showToast, handleRecognizedAccounts);
   }
   $qrFileInput.value = "";
 });
 
 // 2. Scan Screen Capture
 $btnQrScreen.addEventListener("click", async () => {
-  try {
-    showToast("Делаем скриншот вкладки...", "success");
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const activeTab = tabs[0];
-      if (!activeTab) {
-        showToast("Не найдена активная вкладка", "error");
-        return;
-      }
-      chrome.tabs.captureVisibleTab(activeTab.windowId, { format: "png" }, async (dataUrl) => {
-        if (chrome.runtime.lastError) {
-          const errMsg = chrome.runtime.lastError.message || "";
-          console.error("Capture error:", errMsg);
-          showToast("Ошибка: " + errMsg, "error");
-          return;
-        }
-        if (!dataUrl) {
-          showToast("Скриншот пуст", "error");
-          return;
-        }
-
-        // Save screenshot to local storage
-        chrome.storage.local.set({ tempScreenshot: dataUrl }, () => {
-          // Open the crop tab
-          chrome.tabs.create({ url: "crop.html" }, () => {
-            // Close the popup so the user can interact with the crop tab
-            window.close();
-          });
-        });
-      });
-    });
-  } catch (err) {
-    console.error(err);
-    showToast("Сбой захвата экрана", "error");
-  }
+  await scanFromScreen(showToast);
 });
 
 // 3. Paste Clipboard Image click trigger
 $btnQrPaste.addEventListener("click", async () => {
-  try {
-    const clipboardItems = await navigator.clipboard.read();
-    for (const item of clipboardItems) {
-      for (const type of item.types) {
-        if (type.startsWith("image/")) {
-          const blob = await item.getType(type);
-          await handleQrFile(blob);
-          return;
-        }
-      }
-    }
-    showToast("В буфере обмена нет изображений", "error");
-  } catch (err) {
-    console.warn(err);
-    showToast("Используйте Ctrl+V для вставки картинки напрямую", "error");
-  }
+  await scanFromClipboard(showToast, handleRecognizedAccounts);
 });
 
 // 4. Ctrl+V Event Handler
@@ -374,7 +357,7 @@ document.addEventListener("paste", async (e) => {
   for (const item of items) {
     if (item.type.indexOf("image") !== -1) {
       const file = item.getAsFile();
-      await handleQrFile(file);
+      await scanFromFile(file, showToast, handleRecognizedAccounts);
       break;
     }
   }
@@ -393,21 +376,22 @@ $btnQrConfirm.addEventListener("click", async () => {
         acc.digits,
         acc.algorithm,
         acc.type || "totp",
-        acc.counter || 0
+        acc.counter || 0,
+        "none"
       );
     }
-    showToast(pendingQrAccounts.length === 1 ? "Импортировано из QR!" : `Импортировано аккаунтов: ${pendingQrAccounts.length}`);
+    showToast(pendingQrAccounts.length === 1 ? "toast_imported_qr" : getTranslation("toast_imported_count").replace("$1", pendingQrAccounts.length));
     closeAllPanels();
     await renderAccounts();
   } catch (err) {
     console.error(err);
-    showToast("Ошибка сохранения аккаунт(ов)", "error");
+    showToast("toast_save_error_multi", "error");
   }
 });
 
 $btnQrCancel.addEventListener("click", () => {
   resetQrPreview();
-  showToast("Импорт отменен");
+  showToast("toast_import_cancelled");
 });
 
 function resetQrPreview() {
@@ -419,25 +403,41 @@ function resetQrPreview() {
 /* ================================================================
    Render accounts
    ================================================================ */
-const TIMER_CIRCUMFERENCE = 2 * Math.PI * 14; // radius = 14 in SVG
+const TIMER_CIRCUMFERENCE = 2 * Math.PI * 14;
 
 async function renderAccounts() {
+  // If locked, do not render accounts list
+  if (await isLocked()) {
+    $lockScreen.classList.remove("lock-screen--hidden");
+    return;
+  }
+
   const accounts = await loadAccounts();
   $accounts.innerHTML = "";
 
-  if (accounts.length === 0) {
+  // Filter shown list by Category & Search query
+  const query = $inputSearch.value.trim().toLowerCase();
+  const shownAccounts = accounts.filter(acc => {
+    const belongsToCat = currentCategory === "all" || (acc.category || "none") === currentCategory;
+    const matchesSearch = !query || 
+                          (acc.service || "").toLowerCase().includes(query) ||
+                          (acc.login || "").toLowerCase().includes(query);
+    return belongsToCat && matchesSearch;
+  });
+
+  if (shownAccounts.length === 0) {
     $empty.classList.remove("empty-state--hidden");
     return;
   }
   $empty.classList.add("empty-state--hidden");
 
-  for (const acc of accounts) {
+  for (const acc of shownAccounts) {
     let secret;
     try {
       secret = await decryptSecret(acc.secret);
     } catch (err) {
       console.error("Failed to decrypt secret for service: " + acc.service, err);
-      continue; // skip corrupted
+      continue;
     }
 
     const period = acc.period || 30;
@@ -445,6 +445,7 @@ async function renderAccounts() {
     const algorithm = acc.algorithm || "SHA-1";
     const type = acc.type || "totp";
     const counter = acc.counter || 0;
+    const category = acc.category || "none";
 
     let code = "ERROR";
     let isError = false;
@@ -497,12 +498,19 @@ async function renderAccounts() {
       `;
     }
 
+    // Category indicator class if category exists
+    let catTagHtml = "";
+    if (category !== "none") {
+      catTagHtml = `<span class="category-chip category-chip--indicator" style="padding: 2px 6px; font-size: 9px; cursor: default; margin-left: 6px; background-color: var(--accent-glow); color: var(--accent); border-color: var(--accent); border-radius: 8px;">${category}</span>`;
+    }
+
     card.innerHTML = `
       <div class="card__info">
         <div class="card__meta">
           <span class="card__service">${escapeHtml(acc.service)}</span>
           <span class="card__separator">:</span>
           <span class="card__login">${escapeHtml(acc.login)}</span>
+          ${catTagHtml}
         </div>
         <div class="${codeClass}" data-code>${escapeHtml(code)}</div>
       </div>
@@ -516,7 +524,7 @@ async function renderAccounts() {
 }
 
 /* ================================================================
-   Event Delegation for Copy & Delete actions
+   Event Delegation for Card Actions
    ================================================================ */
 $accounts.addEventListener("click", async (e) => {
   const refreshBtn = e.target.closest(".card__btn-refresh");
@@ -526,16 +534,15 @@ $accounts.addEventListener("click", async (e) => {
     const id = refreshBtn.dataset.id;
     try {
       await incrementCounter(id);
-      showToast("Код обновлен!");
+      showToast("toast_code_updated");
       await renderAccounts();
     } catch (err) {
       console.error(err);
-      showToast("Ошибка обновления кода", "error");
+      showToast("toast_update_error", "error");
     }
     return;
   }
 
-  // Left click on card or code to copy the OTP token
   const card = e.target.closest(".card");
   if (card) {
     e.preventDefault();
@@ -545,20 +552,20 @@ $accounts.addEventListener("click", async (e) => {
     const raw = codeEl.textContent.replace(/\s/g, "");
 
     if (raw === "ERROR") {
-      showToast("Ошибка генерации кода", "error");
+      showToast("toast_gen_error", "error");
       return;
     }
 
     const success = await copyToClipboard(raw);
     if (success) {
-      showToast("Код скопирован!");
+      showToast("toast_code_copied");
     } else {
-      showToast("Ошибка копирования", "error");
+      showToast("toast_copy_error", "error");
     }
   }
 });
 
-// Custom Right-Click Context Menu triggers
+// Context Menu triggers
 $accounts.addEventListener("contextmenu", (e) => {
   const card = e.target.closest(".card");
   if (card) {
@@ -566,7 +573,6 @@ $accounts.addEventListener("contextmenu", (e) => {
     e.stopPropagation();
     activeCardId = card.dataset.id;
 
-    // Show and position the context menu
     $contextMenu.classList.remove("context-menu--hidden");
 
     const menuWidth = $contextMenu.offsetWidth || 170;
@@ -574,7 +580,6 @@ $accounts.addEventListener("contextmenu", (e) => {
     let x = e.clientX;
     let y = e.clientY;
 
-    // Boundary check so context menu doesn't overflow popup
     if (x + menuWidth > window.innerWidth) {
       x = window.innerWidth - menuWidth - 10;
     }
@@ -587,12 +592,11 @@ $accounts.addEventListener("contextmenu", (e) => {
   }
 });
 
-// Close context menu when clicking anywhere else
 document.addEventListener("click", () => {
   $contextMenu.classList.add("context-menu--hidden");
 });
 
-// Handle Context Menu Actions
+// Copy from Context Menu
 $ctxCopy.addEventListener("click", async (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -602,22 +606,54 @@ $ctxCopy.addEventListener("click", async (e) => {
   if (card) {
     const codeEl = card.querySelector("[data-code]");
     const raw = codeEl.textContent.replace(/\s/g, "");
-
     if (raw === "ERROR") {
-      showToast("Ошибка генерации кода", "error");
+      showToast("toast_gen_error", "error");
       return;
     }
-
     const success = await copyToClipboard(raw);
     if (success) {
-      showToast("Код скопирован!");
+      showToast("toast_code_copied");
     } else {
-      showToast("Ошибка копирования", "error");
+      showToast("toast_copy_error", "error");
     }
   }
   $contextMenu.classList.add("context-menu--hidden");
 });
 
+// Edit from Context Menu
+$ctxEdit.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  $contextMenu.classList.add("context-menu--hidden");
+  if (!activeCardId) return;
+
+  const accounts = await loadAccounts();
+  const acc = accounts.find(a => a.id === activeCardId);
+  if (acc) {
+    try {
+      const plainSecret = await decryptSecret(acc.secret);
+      $inputSvc.value = acc.service || "";
+      $inputLogin.value = acc.login || "";
+      $inputKey.value = plainSecret;
+      $selectCategory.value = acc.category || "none";
+      
+      closeAllPanels();
+      formOpen = true;
+      $addForm.classList.remove("add-form--hidden");
+      $toggleForm.classList.add("header__btn--active");
+      
+      // Update form headers dynamically
+      $addFormTitle.textContent = getTranslation("panel_title_edit");
+      $btnSave.textContent = getTranslation("btn_save_changes");
+      editingId = activeCardId;
+    } catch (err) {
+      console.error(err);
+      showToast("toast_file_read_error", "error");
+    }
+  }
+});
+
+// Move from Context Menu
 $ctxMove.addEventListener("click", (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -632,6 +668,7 @@ $ctxMove.addEventListener("click", (e) => {
   }
 });
 
+// Delete from Context Menu
 $ctxDelete.addEventListener("click", (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -644,18 +681,18 @@ $ctxDelete.addEventListener("click", (e) => {
     card.addEventListener("animationend", async () => {
       await removeAccount(id);
       await renderAccounts();
-      showToast("Аккаунт удален");
+      showToast("toast_account_deleted");
     }, { once: true });
   }
   $contextMenu.classList.add("context-menu--hidden");
 });
 
 /* ================================================================
-   Live tick loop – updates timers & codes every second per account
+   Live Refresh loops
    ================================================================ */
-let tickInterval = null;
-
 async function tick() {
+  if (await isLocked()) return; // pause loops if locked
+
   let needsReRender = false;
 
   document.querySelectorAll(".card[data-type='totp']").forEach((card) => {
@@ -696,6 +733,392 @@ async function tick() {
 }
 
 /* ================================================================
+   Settings handling
+   ================================================================ */
+const SETTINGS_KEY = "app_settings";
+let appSettings = {
+  accentColor: "white",
+  themeMode: "dark",
+  privacyMode: false,
+  clearClipboardSec: 30
+};
+
+async function loadAppSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(SETTINGS_KEY, (syncResult) => {
+      const syncSaved = syncResult[SETTINGS_KEY];
+      if (syncSaved) {
+        appSettings = {
+          accentColor: syncSaved.accentColor || "white",
+          themeMode: syncSaved.themeMode || "dark",
+          privacyMode: syncSaved.privacyMode !== undefined ? syncSaved.privacyMode : false,
+          clearClipboardSec: syncSaved.clearClipboardSec !== undefined ? parseInt(syncSaved.clearClipboardSec, 10) : 30
+        };
+        resolve(appSettings);
+      } else {
+        chrome.storage.local.get(SETTINGS_KEY, async (localResult) => {
+          const localSaved = localResult[SETTINGS_KEY] || {};
+          appSettings = {
+            accentColor: localSaved.accentColor || "white",
+            themeMode: localSaved.themeMode || "dark",
+            privacyMode: localSaved.privacyMode !== undefined ? localSaved.privacyMode : false,
+            clearClipboardSec: localSaved.clearClipboardSec !== undefined ? parseInt(localSaved.clearClipboardSec, 10) : 30
+          };
+          await saveAppSettings();
+          chrome.storage.local.remove(SETTINGS_KEY);
+          resolve(appSettings);
+        });
+      }
+    });
+  });
+}
+
+async function saveAppSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.set({ [SETTINGS_KEY]: appSettings }, resolve);
+  });
+}
+
+async function populateSettingsUI() {
+  $settingPrivacy.checked = appSettings.privacyMode;
+  $settingClearClipboard.value = appSettings.clearClipboardSec.toString();
+  $settingThemeMode.value = appSettings.themeMode;
+  applyAccentColor(appSettings.accentColor, $colorDots);
+  applyThemeMode(appSettings.themeMode);
+  
+  const isPinSet = await hasPinSet();
+  $settingPinLock.checked = isPinSet;
+}
+
+// Clipboard auto-clear timer
+let clipboardClearTimeout = null;
+
+function triggerClipboardClearTimer() {
+  clearTimeout(clipboardClearTimeout);
+  if (appSettings.clearClipboardSec <= 0) return;
+
+  clipboardClearTimeout = setTimeout(async () => {
+    try {
+      await navigator.clipboard.writeText("");
+      showToast("toast_clipboard_cleared", "success");
+    } catch (err) {
+      console.error("Failed to clear clipboard:", err);
+    }
+  }, appSettings.clearClipboardSec * 1000);
+}
+
+// Accent color choices
+$colorDots.forEach(dot => {
+  dot.addEventListener("click", async () => {
+    const color = dot.dataset.color;
+    appSettings.accentColor = color;
+    applyAccentColor(color, $colorDots);
+    await saveAppSettings();
+    showToast("toast_accent_updated");
+  });
+});
+
+// Privacy Mode setting
+$settingPrivacy.addEventListener("change", async (e) => {
+  appSettings.privacyMode = e.target.checked;
+  await saveAppSettings();
+  await renderAccounts();
+  showToast(appSettings.privacyMode ? "toast_privacy_enabled" : "toast_privacy_disabled");
+});
+
+// Auto-clear Clipboard timeout choice
+$settingClearClipboard.addEventListener("change", async (e) => {
+  appSettings.clearClipboardSec = parseInt(e.target.value, 10);
+  await saveAppSettings();
+  showToast("toast_clipboard_timer_updated");
+});
+
+// Theme Mode select setting
+$settingThemeMode.addEventListener("change", async (e) => {
+  const selectedTheme = e.target.value;
+  appSettings.themeMode = selectedTheme;
+  applyThemeMode(selectedTheme);
+  await saveAppSettings();
+});
+
+// PIN Lock checkbox click triggers setup or verify/remove
+$settingPinLock.addEventListener("change", async (e) => {
+  const turnOn = e.target.checked;
+  
+  if (turnOn) {
+    // Show PIN Setup Overlay
+    $pinSetupOverlay.classList.remove("lock-screen--hidden");
+    resetSetupOverlay();
+  } else {
+    // Turn off: Ask to verify current PIN first
+    $pinSetupOverlay.classList.remove("lock-screen--hidden");
+    resetSetupOverlay();
+    isDisablingPin = true;
+    
+    const $setupTitle = document.getElementById("pin-setup-title");
+    $setupTitle.textContent = getTranslation("pin_enter_current");
+  }
+});
+
+// Backup buttons click triggers
+$btnBackupExport.addEventListener("click", async () => {
+  await exportBackup(showToast);
+});
+
+$btnBackupImportTrigger.addEventListener("click", () => {
+  $inputBackupFile.click();
+});
+
+$inputBackupFile.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    importBackup(file, showToast, renderAccounts);
+  }
+  $inputBackupFile.value = "";
+});
+
+/* ================================================================
+   Search Bar Filtering Logic
+   ================================================================ */
+$inputSearch.addEventListener("input", () => {
+  const query = $inputSearch.value.trim().toLowerCase();
+  if (query) {
+    $btnSearchClear.classList.remove("search-bar__clear--hidden");
+  } else {
+    $btnSearchClear.classList.add("search-bar__clear--hidden");
+  }
+  renderAccounts();
+});
+
+$btnSearchClear.addEventListener("click", () => {
+  $inputSearch.value = "";
+  $btnSearchClear.classList.add("search-bar__clear--hidden");
+  renderAccounts();
+  $inputSearch.focus();
+});
+
+/* ================================================================
+   Horizontal Scroll on Hover triggers
+   ================================================================ */
+$accounts.addEventListener("mouseenter", (e) => {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  const meta = card.querySelector(".card__meta");
+  if (meta) startHorizontalScroll(meta);
+}, true);
+
+$accounts.addEventListener("mouseleave", (e) => {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  const meta = card.querySelector(".card__meta");
+  if (meta) stopHorizontalScroll(meta);
+}, true);
+
+/* ================================================================
+   Categories Chips Filtering
+   ================================================================ */
+$categoryChips.forEach(chip => {
+  chip.addEventListener("click", () => {
+    $categoryChips.forEach(c => c.classList.remove("category-chip--active"));
+    chip.classList.add("category-chip--active");
+    currentCategory = chip.dataset.category;
+    renderAccounts();
+  });
+});
+
+/* ================================================================
+   PIN Lock / Unlock screen controls
+   ================================================================ */
+let unlockPinVal = "";
+
+const $lockNumpadBtns = document.querySelectorAll("#lock-numpad .numpad-btn");
+$lockNumpadBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const val = btn.dataset.val;
+    handleUnlockKeypad(val);
+  });
+});
+
+function handleUnlockKeypad(val) {
+  if (val === "clear") {
+    unlockPinVal = "";
+  } else if (val === "delete") {
+    unlockPinVal = unlockPinVal.slice(0, -1);
+  } else {
+    if (unlockPinVal.length < 4) {
+      unlockPinVal += val;
+    }
+  }
+  updateDotsIndicator("lock-dots", unlockPinVal.length);
+
+  if (unlockPinVal.length === 4) {
+    setTimeout(async () => {
+      try {
+        await unlockKey(unlockPinVal);
+        $lockScreen.classList.add("lock-screen--hidden");
+        unlockPinVal = "";
+        updateDotsIndicator("lock-dots", 0);
+        await renderAccounts();
+      } catch (err) {
+        console.error(err);
+        $lockScreen.classList.add("lock-screen--shake");
+        showToast("toast_pin_incorrect", "error");
+        unlockPinVal = "";
+        updateDotsIndicator("lock-dots", 0);
+        setTimeout(() => {
+          $lockScreen.classList.remove("lock-screen--shake");
+        }, 250);
+      }
+    }, 120);
+  }
+}
+
+// PIN Setup / Verify keypad controls
+let setupPinVal = "";
+let setupConfirmVal = "";
+let isConfirming = false;
+let isDisablingPin = false;
+
+const $setupNumpadBtns = document.querySelectorAll("#setup-numpad .numpad-btn");
+$setupNumpadBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const val = btn.dataset.val;
+    handleSetupKeypad(val);
+  });
+});
+
+$btnPinSetupCancel.addEventListener("click", () => {
+  $pinSetupOverlay.classList.add("lock-screen--hidden");
+  resetSetupOverlay();
+});
+
+function resetSetupOverlay() {
+  setupPinVal = "";
+  setupConfirmVal = "";
+  isConfirming = false;
+  isDisablingPin = false;
+  updateDotsIndicator("setup-dots", 0);
+  const $setupTitle = document.getElementById("pin-setup-title");
+  $setupTitle.textContent = getTranslation("pin_setup_title");
+  
+  // Reset settings checkbox visual lock state
+  hasPinSet().then(hasPin => {
+    $settingPinLock.checked = hasPin;
+  });
+}
+
+function handleSetupKeypad(val) {
+  if (val === "cancel") {
+    $pinSetupOverlay.classList.add("lock-screen--hidden");
+    resetSetupOverlay();
+    return;
+  }
+  
+  if (val === "delete") {
+    if (isDisablingPin) {
+      setupPinVal = setupPinVal.slice(0, -1);
+      updateDotsIndicator("setup-dots", setupPinVal.length);
+    } else if (isConfirming) {
+      setupConfirmVal = setupConfirmVal.slice(0, -1);
+      updateDotsIndicator("setup-dots", setupConfirmVal.length);
+    } else {
+      setupPinVal = setupPinVal.slice(0, -1);
+      updateDotsIndicator("setup-dots", setupPinVal.length);
+    }
+    return;
+  }
+
+  // If we are disabling the PIN, verify it first
+  if (isDisablingPin) {
+    if (setupPinVal.length < 4) {
+      setupPinVal += val;
+    }
+    updateDotsIndicator("setup-dots", setupPinVal.length);
+    
+    if (setupPinVal.length === 4) {
+      setTimeout(async () => {
+        try {
+          await removePin(setupPinVal);
+          $pinSetupOverlay.classList.add("lock-screen--hidden");
+          $settingPinLock.checked = false;
+          showToast("toast_pin_disabled", "success");
+          resetSetupOverlay();
+        } catch (err) {
+          console.error(err);
+          $pinSetupOverlay.classList.add("lock-screen--shake");
+          showToast("toast_pin_incorrect", "error");
+          setupPinVal = "";
+          updateDotsIndicator("setup-dots", 0);
+          setTimeout(() => {
+            $pinSetupOverlay.classList.remove("lock-screen--shake");
+          }, 250);
+        }
+      }, 120);
+    }
+    return;
+  }
+
+  // Creating PIN flow
+  if (!isConfirming) {
+    if (setupPinVal.length < 4) {
+      setupPinVal += val;
+    }
+    updateDotsIndicator("setup-dots", setupPinVal.length);
+    
+    if (setupPinVal.length === 4) {
+      setTimeout(() => {
+        isConfirming = true;
+        const $setupTitle = document.getElementById("pin-setup-title");
+        $setupTitle.textContent = getTranslation("pin_confirm_title");
+        updateDotsIndicator("setup-dots", 0);
+      }, 150);
+    }
+  } else {
+    if (setupConfirmVal.length < 4) {
+      setupConfirmVal += val;
+    }
+    updateDotsIndicator("setup-dots", setupConfirmVal.length);
+    
+    if (setupConfirmVal.length === 4) {
+      setTimeout(async () => {
+        if (setupPinVal === setupConfirmVal) {
+          try {
+            await setupPin(setupPinVal);
+            $pinSetupOverlay.classList.add("lock-screen--hidden");
+            $settingPinLock.checked = true;
+            showToast("toast_pin_set", "success");
+            resetSetupOverlay();
+          } catch (err) {
+            console.error(err);
+            showToast("toast_save_error", "error");
+            $pinSetupOverlay.classList.add("lock-screen--hidden");
+            resetSetupOverlay();
+          }
+        } else {
+          $pinSetupOverlay.classList.add("lock-screen--shake");
+          showToast("toast_pin_mismatch", "error");
+          resetSetupOverlay();
+          setTimeout(() => {
+            $pinSetupOverlay.classList.remove("lock-screen--shake");
+          }, 250);
+        }
+      }, 150);
+    }
+  }
+}
+
+function updateDotsIndicator(containerId, count) {
+  const dots = document.querySelectorAll(`#${containerId} .lock-screen__dot`);
+  dots.forEach((dot, idx) => {
+    if (idx < count) {
+      dot.classList.add("lock-screen__dot--filled");
+    } else {
+      dot.classList.remove("lock-screen__dot--filled");
+    }
+  });
+}
+
+/* ================================================================
    Helpers
    ================================================================ */
 function escapeHtml(str) {
@@ -713,592 +1136,27 @@ function formatCode(code) {
   return code;
 }
 
-
 /* ================================================================
-   Settings handling
-   ================================================================ */
-const SETTINGS_KEY = "app_settings";
-let appSettings = {
-  accentColor: "white",
-  privacyMode: false,
-  clearClipboardSec: 30
-};
-
-async function loadAppSettings() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get(SETTINGS_KEY, (syncResult) => {
-      const syncSaved = syncResult[SETTINGS_KEY];
-      if (syncSaved) {
-        appSettings = {
-          accentColor: syncSaved.accentColor || "white",
-          privacyMode: syncSaved.privacyMode !== undefined ? syncSaved.privacyMode : false,
-          clearClipboardSec: syncSaved.clearClipboardSec !== undefined ? parseInt(syncSaved.clearClipboardSec, 10) : 30
-        };
-        resolve(appSettings);
-      } else {
-        // Check local storage for migration
-        chrome.storage.local.get(SETTINGS_KEY, async (localResult) => {
-          const localSaved = localResult[SETTINGS_KEY] || {};
-          appSettings = {
-            accentColor: localSaved.accentColor || "white",
-            privacyMode: localSaved.privacyMode !== undefined ? localSaved.privacyMode : false,
-            clearClipboardSec: localSaved.clearClipboardSec !== undefined ? parseInt(localSaved.clearClipboardSec, 10) : 30
-          };
-          // Save to sync
-          await saveAppSettings();
-          // Clean local
-          chrome.storage.local.remove(SETTINGS_KEY);
-          resolve(appSettings);
-        });
-      }
-    });
-  });
-}
-
-async function saveAppSettings() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.set({ [SETTINGS_KEY]: appSettings }, resolve);
-  });
-}
-
-const ACCENT_COLOR_MAP = {
-  white: { accent: "#ffffff", hover: "#e0e0e0", glow: "rgba(255, 255, 255, 0.12)" },
-  green: { accent: "#3ecf8e", hover: "#4de09e", glow: "rgba(62, 207, 142, 0.12)" },
-  blue: { accent: "#1a73e8", hover: "#3b82f6", glow: "rgba(26, 115, 232, 0.12)" },
-  purple: { accent: "#a855f7", hover: "#c084fc", glow: "rgba(168, 85, 247, 0.12)" },
-  orange: { accent: "#f97316", hover: "#fb923c", glow: "rgba(249, 115, 22, 0.12)" }
-};
-
-function applyAccentColor(colorName) {
-  const vars = ACCENT_COLOR_MAP[colorName] || ACCENT_COLOR_MAP.white;
-  document.documentElement.style.setProperty("--accent", vars.accent);
-  document.documentElement.style.setProperty("--accent-hover", vars.hover);
-  document.documentElement.style.setProperty("--accent-glow", vars.glow);
-
-  $colorDots.forEach(dot => {
-    if (dot.dataset.color === colorName) {
-      dot.classList.add("color-dot--active");
-    } else {
-      dot.classList.remove("color-dot--active");
-    }
-  });
-}
-
-function populateSettingsUI() {
-  $settingPrivacy.checked = appSettings.privacyMode;
-  $settingClearClipboard.value = appSettings.clearClipboardSec.toString();
-  applyAccentColor(appSettings.accentColor);
-}
-
-// Clipboard auto-clear helper
-let clipboardClearTimeout = null;
-
-function triggerClipboardClearTimer(copiedText) {
-  clearTimeout(clipboardClearTimeout);
-  if (appSettings.clearClipboardSec <= 0) return;
-
-  clipboardClearTimeout = setTimeout(async () => {
-    try {
-      await navigator.clipboard.writeText("");
-      showToast("Буфер обмена очищен", "success");
-    } catch (err) {
-      console.error("Failed to clear clipboard:", err);
-    }
-  }, appSettings.clearClipboardSec * 1000);
-}
-
-// Event Listeners for Settings Options
-$colorDots.forEach(dot => {
-  dot.addEventListener("click", async () => {
-    const color = dot.dataset.color;
-    appSettings.accentColor = color;
-    applyAccentColor(color);
-    await saveAppSettings();
-    showToast("Акцентный цвет изменен");
-  });
-});
-
-$settingPrivacy.addEventListener("change", async (e) => {
-  appSettings.privacyMode = e.target.checked;
-  await saveAppSettings();
-  await renderAccounts();
-  showToast(appSettings.privacyMode ? "Режим приватности включен" : "Режим приватности выключен");
-});
-
-$settingClearClipboard.addEventListener("change", async (e) => {
-  appSettings.clearClipboardSec = parseInt(e.target.value, 10);
-  await saveAppSettings();
-  showToast("Время автоочистки буфера обновлено");
-});
-
-// Backup Export Logic
-$btnBackupExport.addEventListener("click", async () => {
-  try {
-    const accounts = await loadAccounts();
-    const decryptedAccounts = [];
-    
-    for (const acc of accounts) {
-      try {
-        const plainSecret = await decryptSecret(acc.secret);
-        decryptedAccounts.push({
-          service: acc.service,
-          login: acc.login,
-          secret: plainSecret,
-          period: acc.period || 30,
-          digits: acc.digits || 6,
-          algorithm: acc.algorithm || "SHA-1",
-          type: acc.type || "totp",
-          counter: acc.counter || 0
-        });
-      } catch (err) {
-        console.error("Failed to decrypt account during backup export:", acc.service, err);
-      }
-    }
-
-    const backupData = {
-      source: "OnePass Auth Backup",
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      accounts: decryptedAccounts
-    };
-
-    const jsonString = JSON.stringify(backupData, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `onepass_auth_backup_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast("Резервная копия скачана");
-  } catch (err) {
-    console.error("Backup export error:", err);
-    showToast("Ошибка экспорта бэкапа", "error");
-  }
-});
-
-// Backup Import Logic
-$btnBackupImportTrigger.addEventListener("click", () => {
-  $inputBackupFile.click();
-});
-
-$inputBackupFile.addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  try {
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = JSON.parse(event.target.result);
-        if (data.source !== "OnePass Auth Backup" || !Array.isArray(data.accounts)) {
-          showToast("Некорректный файл бэкапа", "error");
-          return;
-        }
-
-        const currentAccounts = await loadAccounts();
-        const currentPlainList = [];
-        
-        for (const acc of currentAccounts) {
-          try {
-            const plain = await decryptSecret(acc.secret);
-            currentPlainList.push({ service: acc.service, login: acc.login, secret: plain });
-          } catch (err) {}
-        }
-
-        let importedCount = 0;
-        let skippedCount = 0;
-
-        for (const acc of data.accounts) {
-          if (!acc.service || !acc.login || !acc.secret) {
-            skippedCount++;
-            continue;
-          }
-
-          if (!isValidBase32(acc.secret)) {
-            skippedCount++;
-            continue;
-          }
-
-          const isDuplicate = currentPlainList.some(curr => 
-            curr.service.toLowerCase() === acc.service.toLowerCase() &&
-            curr.login.toLowerCase() === acc.login.toLowerCase() &&
-            curr.secret === acc.secret
-          );
-
-          if (isDuplicate) {
-            skippedCount++;
-            continue;
-          }
-
-          await addAccount(
-            acc.service,
-            acc.login,
-            acc.secret,
-            acc.period || 30,
-            acc.digits || 6,
-            acc.algorithm || "SHA-1",
-            acc.type || "totp",
-            acc.counter || 0
-          );
-          importedCount++;
-        }
-
-        if (importedCount > 0) {
-          showToast(`Импортировано: ${importedCount} аккаунтов`);
-          await renderAccounts();
-        } else {
-          showToast("Все аккаунты из бэкапа уже добавлены");
-        }
-      } catch (err) {
-        console.error("Failed to parse JSON backup:", err);
-        showToast("Ошибка чтения файла", "error");
-      }
-    };
-    reader.readAsText(file);
-  } catch (err) {
-    console.error("Backup import file error:", err);
-    showToast("Ошибка импорта файла", "error");
-  }
-  $inputBackupFile.value = "";
-});
-
-/* ================================================================
-   Search Bar Filtering Logic
-   ================================================================ */
-$inputSearch.addEventListener("input", () => {
-  const query = $inputSearch.value.trim().toLowerCase();
-  
-  if (query) {
-    $btnSearchClear.classList.remove("search-bar__clear--hidden");
-  } else {
-    $btnSearchClear.classList.add("search-bar__clear--hidden");
-  }
-
-  filterAccounts(query);
-});
-
-$btnSearchClear.addEventListener("click", () => {
-  $inputSearch.value = "";
-  $btnSearchClear.classList.add("search-bar__clear--hidden");
-  filterAccounts("");
-  $inputSearch.focus();
-});
-
-function filterAccounts(query) {
-  const cards = document.querySelectorAll(".card");
-  cards.forEach((card) => {
-    const service = (card.querySelector(".card__service")?.textContent || "").toLowerCase();
-    const login = (card.querySelector(".card__login")?.textContent || "").toLowerCase();
-    
-    if (service.includes(query) || login.includes(query)) {
-      card.style.display = "";
-    } else {
-      card.style.display = "none";
-    }
-  });
-}
-
-/* ================================================================
-   Horizontal Scroll on Hover for Long Texts
-   ================================================================ */
-let activeScrollIntervals = new Map();
-
-function startHorizontalScroll(element) {
-  stopHorizontalScroll(element);
-  const limit = element.scrollWidth - element.clientWidth;
-  if (limit <= 0) return;
-
-  let dir = 1;
-  let pauseTicks = 0;
-
-  const interval = setInterval(() => {
-    if (pauseTicks > 0) {
-      pauseTicks--;
-      return;
-    }
-
-    if (dir === 1) {
-      element.scrollLeft += 1;
-      if (element.scrollLeft >= limit) {
-        dir = -1;
-        pauseTicks = 40; // Approx 1s pause
-      }
-    } else {
-      element.scrollLeft -= 1;
-      if (element.scrollLeft <= 0) {
-        dir = 1;
-        pauseTicks = 40;
-      }
-    }
-  }, 25);
-
-  activeScrollIntervals.set(element, interval);
-}
-
-function stopHorizontalScroll(element) {
-  if (activeScrollIntervals.has(element)) {
-    clearInterval(activeScrollIntervals.get(element));
-    activeScrollIntervals.delete(element);
-  }
-  element.scrollTo({ left: 0, behavior: "smooth" });
-}
-
-$accounts.addEventListener("mouseenter", (e) => {
-  const card = e.target.closest(".card");
-  if (!card) return;
-  const meta = card.querySelector(".card__meta");
-  if (meta) startHorizontalScroll(meta);
-}, true);
-
-$accounts.addEventListener("mouseleave", (e) => {
-  const card = e.target.closest(".card");
-  if (!card) return;
-  const meta = card.querySelector(".card__meta");
-  if (meta) stopHorizontalScroll(meta);
-}, true);
-
-/* ================================================================
-   Drag & Drop holding reordering
-   ================================================================ */
-let dragTimeout = null;
-let isDragging = false;
-let dragEl = null;
-let startClientY = 0;
-let originalIndex = -1;
-
-$accounts.addEventListener("mousedown", onDragStart);
-$accounts.addEventListener("touchstart", onDragStart, { passive: false });
-
-function onDragStart(e) {
-  if (e.type === "mousedown" && e.button !== 0) return;
-  
-  const card = e.target.closest(".card");
-  if (!card) return;
-
-  if (e.target.closest(".card__timer") || e.target.closest(".card__actions") || e.target.closest(".context-menu")) return;
-
-  const clientY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
-  const clientX = e.type === "touchstart" ? e.touches[0].clientX : e.clientX;
-
-  dragTimeout = setTimeout(() => {
-    startDrag(card, clientY, clientX);
-  }, 250); // 250ms hold
-
-  const cancelDragHold = () => {
-    clearTimeout(dragTimeout);
-    document.removeEventListener("mouseup", cancelDragHold);
-    document.removeEventListener("touchend", cancelDragHold);
-    document.removeEventListener("mousemove", checkMoveBeforeHold);
-    document.removeEventListener("touchmove", checkMoveBeforeHold);
-  };
-
-  const checkMoveBeforeHold = (event) => {
-    const currentY = event.type === "touchmove" ? event.touches[0].clientY : event.clientY;
-    const currentX = event.type === "touchmove" ? event.touches[0].clientX : event.clientX;
-    if (Math.abs(currentY - clientY) > 5 || Math.abs(currentX - clientX) > 5) {
-      clearTimeout(dragTimeout);
-    }
-  };
-
-  document.addEventListener("mouseup", cancelDragHold);
-  document.addEventListener("touchend", cancelDragHold);
-  document.addEventListener("mousemove", checkMoveBeforeHold);
-  document.addEventListener("touchmove", checkMoveBeforeHold);
-}
-
-function startDrag(card, clientY, clientX) {
-  isDragging = true;
-  dragEl = card;
-  startClientY = clientY;
-  originalIndex = Array.from($accounts.children).indexOf(card);
-
-  dragEl.classList.add("card--dragging");
-  dragEl.style.transform = "scale(1.03)";
-
-  if (navigator.vibrate) {
-    navigator.vibrate(50);
-  }
-
-  if (clientX === undefined) {
-    document.addEventListener("touchmove", onDragMove, { passive: false });
-    document.addEventListener("touchend", onDragEnd);
-  } else {
-    document.addEventListener("mousemove", onDragMove);
-    document.addEventListener("mouseup", onDragEnd);
-  }
-}
-
-function onDragMove(e) {
-  if (!isDragging || !dragEl) return;
-  if (e.cancelable) e.preventDefault();
-
-  const clientY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
-  const deltaY = clientY - startClientY;
-
-  dragEl.style.transform = `translateY(${deltaY}px) scale(1.03)`;
-
-  const rect = dragEl.getBoundingClientRect();
-  const dragCenterY = rect.top + rect.height / 2;
-  const dragCenterX = rect.left + rect.width / 2;
-
-  dragEl.style.visibility = "hidden";
-  const elemBelow = document.elementFromPoint(dragCenterX, dragCenterY);
-  dragEl.style.visibility = "visible";
-
-  if (!elemBelow) return;
-  const targetCard = elemBelow.closest(".card");
-
-  if (targetCard && targetCard !== dragEl) {
-    const targetRect = targetCard.getBoundingClientRect();
-    const targetCenterY = targetRect.top + targetRect.height / 2;
-
-    if (clientY > targetCenterY && dragEl.nextElementSibling === targetCard) {
-      animateReorder($accounts, dragEl, targetCard.nextElementSibling);
-      startClientY = clientY;
-      dragEl.style.transform = "translateY(0px) scale(1.03)";
-    } else if (clientY < targetCenterY && dragEl.previousElementSibling === targetCard) {
-      animateReorder($accounts, dragEl, targetCard);
-      startClientY = clientY;
-      dragEl.style.transform = "translateY(0px) scale(1.03)";
-    }
-  }
-}
-
-async function onDragEnd() {
-  if (!isDragging) return;
-  isDragging = false;
-
-  document.removeEventListener("mousemove", onDragMove);
-  document.removeEventListener("mouseup", onDragEnd);
-  document.removeEventListener("touchmove", onDragMove);
-  document.removeEventListener("touchend", onDragEnd);
-
-  dragEl.classList.remove("card--dragging");
-  dragEl.style.transform = "";
-  
-  const finalIndex = Array.from($accounts.children).indexOf(dragEl);
-  if (finalIndex !== originalIndex) {
-    await reorderAccountsInStorage(originalIndex, finalIndex);
-    showToast("Порядок аккаунтов изменен");
-  }
-
-  dragEl = null;
-}
-
-function animateReorder(parent, dragging, beforeNode) {
-  const children = Array.from(parent.children).filter(c => c !== dragging);
-  
-  const firstPositions = children.map(c => ({
-    el: c,
-    rect: c.getBoundingClientRect()
-  }));
-
-  parent.insertBefore(dragging, beforeNode);
-
-  firstPositions.forEach(pos => {
-    const lastRect = pos.el.getBoundingClientRect();
-    const invertY = pos.rect.top - lastRect.top;
-    
-    if (invertY !== 0) {
-      pos.el.style.transition = 'none';
-      pos.el.style.transform = `translateY(${invertY}px)`;
-      pos.el.offsetHeight;
-      pos.el.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
-      pos.el.style.transform = 'translateY(0)';
-    }
-  });
-}
-
-async function reorderAccountsInStorage(fromIndex, fromTargetIndex) {
-  const accounts = await loadAccounts();
-  const moved = accounts.splice(fromIndex, 1)[0];
-  accounts.splice(fromTargetIndex, 0, moved);
-  await saveAccounts(accounts);
-}
-
-/* ================================================================
-   Move Mode (Keyboard Reordering)
-   ================================================================ */
-let isReorderingMode = false;
-let reorderEl = null;
-let reorderOriginalIndex = -1;
-
-function startReorderMode(card) {
-  if (isReorderingMode) return;
-  isReorderingMode = true;
-  reorderEl = card;
-  reorderOriginalIndex = Array.from($accounts.children).indexOf(card);
-
-  $accounts.classList.add("accounts--reordering");
-  reorderEl.classList.add("card--reordering");
-
-  document.addEventListener("keydown", onReorderKeyDown);
-  document.addEventListener("click", onReorderClick, { capture: true });
-
-  showToast("Режим перемещения. Используйте стрелки ↑/↓.", "success");
-}
-
-async function stopReorderMode() {
-  if (!isReorderingMode) return;
-  isReorderingMode = false;
-
-  document.removeEventListener("keydown", onReorderKeyDown);
-  document.removeEventListener("click", onReorderClick, { capture: true });
-
-  $accounts.classList.remove("accounts--reordering");
-  if (reorderEl) {
-    reorderEl.classList.remove("card--reordering");
-    reorderEl.style.transform = "";
-  }
-
-  const finalIndex = Array.from($accounts.children).indexOf(reorderEl);
-  if (finalIndex !== reorderOriginalIndex) {
-    await reorderAccountsInStorage(reorderOriginalIndex, finalIndex);
-    showToast("Порядок аккаунтов сохранен");
-  }
-
-  reorderEl = null;
-}
-
-function onReorderKeyDown(e) {
-  if (!isReorderingMode || !reorderEl) return;
-
-  if (e.key === "ArrowUp") {
-    e.preventDefault();
-    const prev = reorderEl.previousElementSibling;
-    if (prev && prev.classList.contains("card")) {
-      animateReorder($accounts, reorderEl, prev);
-      reorderEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  } else if (e.key === "ArrowDown") {
-    e.preventDefault();
-    const next = reorderEl.nextElementSibling;
-    if (next && next.classList.contains("card")) {
-      animateReorder($accounts, reorderEl, next.nextElementSibling);
-      reorderEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  } else if (e.key === "Enter" || e.key === "Escape") {
-    e.preventDefault();
-    stopReorderMode();
-  }
-}
-
-function onReorderClick(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  stopReorderMode();
-}
-
-/* ================================================================
-   Boot
+   Boot logic
    ================================================================ */
 (async () => {
+  // Load local settings & apply theme
   await loadAppSettings();
+  
+  // Set up localized elements
+  initTranslations();
   populateSettingsUI();
-  await renderAccounts();
-  tickInterval = setInterval(tick, 1000);
+
+  // Initialize reordering logic
+  initDragAndDrop($accounts, showToast);
+
+  // Lock status check
+  const locked = await isLocked();
+  if (locked) {
+    $lockScreen.classList.remove("lock-screen--hidden");
+  } else {
+    await renderAccounts();
+  }
+
+  setInterval(tick, 1000);
 })();

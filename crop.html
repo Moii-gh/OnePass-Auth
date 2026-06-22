@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>OnePass Auth – Выбор области сканирования</title>
+  <title data-i18n="crop_title">OnePass Auth – Выбор области сканирования</title>
   <style>
     body {
       margin: 0;
@@ -144,25 +144,21 @@
     <canvas id="screenshot-canvas"></canvas>
 
     <div class="header-bar">
-      <span class="header-bar__text">Выделите рамкой область с QR-кодом</span>
-      <button id="btn-cancel" class="header-bar__btn">Отмена</button>
+      <span class="header-bar__text" data-i18n="crop_header_text">Выделите рамкой область с QR-кодом</span>
+      <button id="btn-cancel" class="header-bar__btn" data-i18n="crop_cancel">Отмена</button>
     </div>
 
     <div id="toast" class="toast"></div>
 
     <div id="instruction-overlay">
-      <h1>OnePass Auth – Сканирование QR</h1>
-      <p>Зажмите левую кнопку мыши и выделите прямоугольником QR-код на экране</p>
-      <button id="btn-start">Начать выделение</button>
+      <h1 data-i18n="crop_instruction_title">OnePass Auth – Сканирование QR</h1>
+      <p data-i18n="crop_instruction_desc">Зажмите левую кнопку мыши и выделите прямоугольником QR-код на экране</p>
+      <button id="btn-start" data-i18n="crop_instruction_start">Начать выделение</button>
     </div>
   </div>
 
   <!-- Library Scripts -->
-  <script src="crypto.js"></script>
-  <script src="totp.js"></script>
-  <script src="storage.js"></script>
   <script src="jsQR.js"></script>
-  <script src="qr.js"></script>
-  <script src="crop.js"></script>
+  <script type="module" src="crop.js"></script>
 </body>
 </html>

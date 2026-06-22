@@ -1,24 +1,15 @@
 /**
- * storage.js – CRUD for accounts using chrome.storage.local.
- *
- * Each account is stored as:
- * {
- *   id:      string,   // unique id (timestamp-based)
- *   service: string,   // service name
- *   login:   string,   // username / email
- *   secret:  { iv: number[], data: number[] }  // encrypted secret
- * }
- *
- * All accounts are kept under the storage key "accounts" as an array.
+ * storage.js – CRUD for accounts using chrome.storage.local / sync.
  */
+
+import { encryptSecret, decryptSecret } from './crypto.js';
 
 const ACCOUNTS_KEY = "accounts";
 
 /**
  * Load all accounts from sync storage. If empty, checks local storage for migration.
- * @returns {Promise<Array>}
  */
-async function loadAccounts() {
+export async function loadAccounts() {
   return new Promise((resolve) => {
     chrome.storage.sync.get(ACCOUNTS_KEY, async (syncResult) => {
       const syncAccounts = syncResult[ACCOUNTS_KEY];
@@ -46,7 +37,7 @@ async function loadAccounts() {
 /**
  * Save full accounts array to sync storage.
  */
-async function saveAccounts(accounts) {
+export async function saveAccounts(accounts) {
   return new Promise((resolve) =>
     chrome.storage.sync.set({ [ACCOUNTS_KEY]: accounts }, resolve)
   );
@@ -54,16 +45,8 @@ async function saveAccounts(accounts) {
 
 /**
  * Add a new account. The secret is encrypted before saving.
- * @param {string} service
- * @param {string} login
- * @param {string} secretPlain – Base32 secret (plaintext)
- * @param {number} period
- * @param {number} digits
- * @param {string} algorithm
- * @param {string} type – "totp" or "hotp"
- * @param {number} counter – initial counter value for HOTP
  */
-async function addAccount(service, login, secretPlain, period = 30, digits = 6, algorithm = "SHA-1", type = "totp", counter = 0) {
+export async function addAccount(service, login, secretPlain, period = 30, digits = 6, algorithm = "SHA-1", type = "totp", counter = 0, category = "none") {
   const encrypted = await encryptSecret(secretPlain);
   const accounts = await loadAccounts();
   accounts.push({
@@ -75,17 +58,43 @@ async function addAccount(service, login, secretPlain, period = 30, digits = 6, 
     digits,
     algorithm,
     type,
-    counter
+    counter,
+    category
   });
   await saveAccounts(accounts);
 }
 
 /**
- * Increment HOTP counter for an account.
- * @param {string} id
- * @returns {Promise<number|null>} new counter value, or null if account not found
+ * Update an existing account details.
  */
-async function incrementCounter(id) {
+export async function updateAccount(id, service, login, secretPlain, period = 30, digits = 6, algorithm = "SHA-1", type = "totp", counter = 0, category = "none") {
+  const accounts = await loadAccounts();
+  const index = accounts.findIndex(a => a.id === id);
+  if (index !== -1) {
+    let encrypted = accounts[index].secret;
+    if (secretPlain) {
+      encrypted = await encryptSecret(secretPlain);
+    }
+    accounts[index] = {
+      id,
+      service,
+      login,
+      secret: encrypted,
+      period,
+      digits,
+      algorithm,
+      type,
+      counter,
+      category
+    };
+    await saveAccounts(accounts);
+  }
+}
+
+/**
+ * Increment HOTP counter for an account.
+ */
+export async function incrementCounter(id) {
   const accounts = await loadAccounts();
   const index = accounts.findIndex(a => a.id === id);
   if (index !== -1) {
@@ -99,8 +108,9 @@ async function incrementCounter(id) {
 /**
  * Remove an account by its id.
  */
-async function removeAccount(id) {
+export async function removeAccount(id) {
   let accounts = await loadAccounts();
   accounts = accounts.filter((a) => a.id !== id);
   await saveAccounts(accounts);
 }
+

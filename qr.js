@@ -230,7 +230,7 @@ function parseMigrationUrl(urlStr) {
  * @param {string} urlStr
  * @returns {Object} parsed account data
  */
-function parseOtpauthUrl(urlStr) {
+export function parseOtpauthUrl(urlStr) {
   if (urlStr.startsWith("otpauth-migration://")) {
     return parseMigrationUrl(urlStr);
   }
@@ -296,7 +296,7 @@ function parseOtpauthUrl(urlStr) {
  * @param {File} file
  * @returns {Promise<Array>} Decoded accounts list
  */
-function decodeQrCode(file) {
+export function decodeQrCode(file) {
   return new Promise((resolve, reject) => {
     if (!file) {
       reject(new Error("Файл не выбран"));

@@ -1,5 +1,10 @@
 // crop.js - Controller for the full-screen selection cropping page
 
+import { addAccount } from './storage.js';
+import { parseOtpauthUrl } from './qr.js';
+import { isValidBase32 } from './totp.js';
+import { initTranslations, getTranslation } from './i18n.js';
+
 const $canvas = document.getElementById("screenshot-canvas");
 const ctx = $canvas.getContext("2d");
 const $toast = document.getElementById("toast");
@@ -29,10 +34,12 @@ function showToast(msg, type = "error") {
 
 // Initial setup
 async function init() {
+  initTranslations();
+  
   // Load the temporary screenshot taken by popup
   const data = await chrome.storage.local.get("tempScreenshot");
   if (!data.tempScreenshot) {
-    showToast("Скриншот не найден. Пожалуйста, откройте расширение и попробуйте снова.", "error");
+    showToast(getTranslation("crop_toast_no_screenshot"), "error");
     setTimeout(() => window.close(), 2500);
     return;
   }
@@ -171,7 +178,7 @@ async function processCrop(x, y, w, h) {
   const code = jsQR(imageData.data, imageData.width, imageData.height);
 
   if (!code) {
-    showToast("QR-код не найден в выделенной области. Попробуйте ещё раз.", "error");
+    showToast(getTranslation("crop_toast_no_qr"), "error");
     // Clear selection for retry
     startX = 0;
     startY = 0;
@@ -186,13 +193,13 @@ async function processCrop(x, y, w, h) {
     const accountList = parseOtpauthUrl(code.data);
     
     if (!accountList || accountList.length === 0) {
-      showToast("Некорректные данные QR-кода", "error");
+      showToast(getTranslation("crop_toast_invalid_qr"), "error");
       return;
     }
 
     for (const acc of accountList) {
       if (!isValidBase32(acc.secret)) {
-        throw new Error(`Секретный ключ для ${acc.service} некорректен`);
+        throw new Error(getTranslation("crop_toast_invalid_key", acc.service));
       }
     }
 
@@ -216,7 +223,9 @@ async function processCrop(x, y, w, h) {
     // Show success
     const count = accountList.length;
     showToast(
-      count === 1 ? "Аккаунт успешно импортирован!" : `Импортировано аккаунтов: ${count}`, 
+      count === 1 
+        ? getTranslation("crop_toast_imported_success") 
+        : getTranslation("crop_toast_imported_count", count), 
       "success"
     );
 
@@ -227,7 +236,7 @@ async function processCrop(x, y, w, h) {
 
   } catch (err) {
     console.error("Import error:", err);
-    showToast(err.message || "Ошибка импорта аккаунта", "error");
+    showToast(err.message || getTranslation("crop_toast_import_error"), "error");
   }
 }
 

@@ -1,36 +1,182 @@
 /**
  * crypto.js – AES-GCM encryption / decryption via Web Crypto API.
  *
- * The encryption key is generated once and persisted in chrome.storage.local
- * under the key "__enc_key". IV is stored alongside every ciphertext.
+ * Support for cryptographic locking of the encryption key with a user PIN using PBKDF2.
  */
 
 const CRYPTO_KEY_STORAGE = "__enc_key";
 
+let inMemoryKey = null;
+
 /**
- * Return (or create) the AES-GCM CryptoKey.
- * The raw key bytes are exported and stored as a JSON-safe array so they
- * survive browser restarts.
+ * Clear in-memory key (e.g. on lock)
  */
-async function getEncryptionKey() {
-  const stored = await new Promise((resolve) =>
-    chrome.storage.local.get(CRYPTO_KEY_STORAGE, (r) =>
-      resolve(r[CRYPTO_KEY_STORAGE])
+export function clearInMemoryKey() {
+  inMemoryKey = null;
+}
+
+/**
+ * Check if the key is locked
+ */
+export async function isLocked() {
+  const storedData = await new Promise((resolve) =>
+    chrome.storage.local.get("__enc_key_locked", resolve)
+  );
+  return !!storedData["__enc_key_locked"] && !inMemoryKey;
+}
+
+/**
+ * Check if a PIN is set at all
+ */
+export async function hasPinSet() {
+  const storedData = await new Promise((resolve) =>
+    chrome.storage.local.get("__enc_key_locked", resolve)
+  );
+  return !!storedData["__enc_key_locked"];
+}
+
+/**
+ * Unlock the key using the user's PIN
+ */
+export async function unlockKey(pin) {
+  const storedData = await new Promise((resolve) =>
+    chrome.storage.local.get(["__enc_key_locked", "__enc_key_salt", "__enc_key_iv"], resolve)
+  );
+
+  if (!storedData["__enc_key_locked"]) {
+    throw new Error("No PIN set");
+  }
+
+  const lockedBytes = new Uint8Array(storedData["__enc_key_locked"]);
+  const saltBytes = new Uint8Array(storedData["__enc_key_salt"]);
+  const ivBytes = new Uint8Array(storedData["__enc_key_iv"]);
+
+  const pKey = await deriveKeyFromPin(pin, saltBytes);
+  const decryptedBuffer = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: ivBytes },
+    pKey,
+    lockedBytes
+  );
+
+  const rawBytes = new Uint8Array(decryptedBuffer);
+  inMemoryKey = await crypto.subtle.importKey("raw", rawBytes, "AES-GCM", true, [
+    "encrypt",
+    "decrypt",
+  ]);
+  return true;
+}
+
+/**
+ * Setup a new PIN and encrypt the master key with it
+ */
+export async function setupPin(pin) {
+  const key = await getEncryptionKey();
+  const rawBytes = new Uint8Array(await crypto.subtle.exportKey("raw", key));
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const pKey = await deriveKeyFromPin(pin, salt);
+  const cipherBuffer = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    pKey,
+    rawBytes
+  );
+
+  await new Promise((resolve) =>
+    chrome.storage.local.set(
+      {
+        __enc_key_locked: Array.from(new Uint8Array(cipherBuffer)),
+        __enc_key_salt: Array.from(salt),
+        __enc_key_iv: Array.from(iv)
+      },
+      resolve
     )
   );
 
-  if (stored) {
-    const rawBytes = new Uint8Array(stored);
-    return crypto.subtle.importKey("raw", rawBytes, "AES-GCM", true, [
+  // Remove plaintext key from storage
+  await new Promise((resolve) =>
+    chrome.storage.local.remove(CRYPTO_KEY_STORAGE, resolve)
+  );
+
+  inMemoryKey = key;
+}
+
+/**
+ * Remove the PIN lock and restore the master key to plaintext storage
+ */
+export async function removePin(pin) {
+  await unlockKey(pin);
+
+  const rawBytes = new Uint8Array(await crypto.subtle.exportKey("raw", inMemoryKey));
+
+  await new Promise((resolve) =>
+    chrome.storage.local.set(
+      { [CRYPTO_KEY_STORAGE]: Array.from(rawBytes) },
+      resolve
+    )
+  );
+
+  await new Promise((resolve) =>
+    chrome.storage.local.remove(["__enc_key_locked", "__enc_key_salt", "__enc_key_iv"], resolve)
+  );
+}
+
+/**
+ * Derive an AES key from a PIN using PBKDF2
+ */
+async function deriveKeyFromPin(pin, saltBytes) {
+  const pinBuffer = new TextEncoder().encode(pin);
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    pinBuffer,
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: saltBytes,
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+/**
+ * Return (or create) the AES-GCM CryptoKey.
+ */
+export async function getEncryptionKey() {
+  if (inMemoryKey) {
+    return inMemoryKey;
+  }
+
+  const storedData = await new Promise((resolve) =>
+    chrome.storage.local.get([CRYPTO_KEY_STORAGE, "__enc_key_locked"], resolve)
+  );
+
+  if (storedData["__enc_key_locked"]) {
+    throw new Error("Key is locked");
+  }
+
+  if (storedData[CRYPTO_KEY_STORAGE]) {
+    const rawBytes = new Uint8Array(storedData[CRYPTO_KEY_STORAGE]);
+    inMemoryKey = await crypto.subtle.importKey("raw", rawBytes, "AES-GCM", true, [
       "encrypt",
       "decrypt",
     ]);
+    return inMemoryKey;
   }
 
   // First launch – generate a new 256-bit key
   const key = await crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
-    true, // extractable so we can persist it
+    true,
     ["encrypt", "decrypt"]
   );
 
@@ -42,16 +188,16 @@ async function getEncryptionKey() {
     )
   );
 
+  inMemoryKey = key;
   return key;
 }
 
 /**
  * Encrypt a plaintext string.
- * @returns {{ iv: number[], data: number[] }}
  */
-async function encryptSecret(plaintext) {
+export async function encryptSecret(plaintext) {
   const key = await getEncryptionKey();
-  const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV for GCM
+  const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
 
   const cipherBuffer = await crypto.subtle.encrypt(
@@ -68,9 +214,8 @@ async function encryptSecret(plaintext) {
 
 /**
  * Decrypt a ciphertext object produced by encryptSecret().
- * @returns {string} plaintext
  */
-async function decryptSecret(encryptedObj) {
+export async function decryptSecret(encryptedObj) {
   const key = await getEncryptionKey();
   const iv = new Uint8Array(encryptedObj.iv);
   const data = new Uint8Array(encryptedObj.data);
@@ -83,3 +228,4 @@ async function decryptSecret(encryptedObj) {
 
   return new TextDecoder().decode(plainBuffer);
 }
+

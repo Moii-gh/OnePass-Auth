@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "OnePass Auth",
+  "name": "__MSG_extension_name__",
+  "default_locale": "ru",
   "version": "1.0.0",
-  "description": "TOTP authenticator – generate 6-digit codes (RFC 6238)",
+  "description": "__MSG_extension_description__",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
