@@ -279,6 +279,18 @@
       </svg>
       <span data-i18n="ctx_move">Переместить</span>
     </button>
+    <button class="context-menu__item" id="ctx-qr">
+      <svg class="context-menu__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <rect x="7" y="7" width="3" height="3"/>
+        <rect x="14" y="7" width="3" height="3"/>
+        <rect x="7" y="14" width="3" height="3"/>
+        <line x1="14" y1="14" x2="14" y2="14.01"/>
+        <line x1="17" y1="14" x2="17" y2="14.01"/>
+        <line x1="14" y1="17" x2="17" y2="17"/>
+      </svg>
+      <span data-i18n="ctx_show_qr">Показать QR-код</span>
+    </button>
     <button class="context-menu__item context-menu__item--danger" id="ctx-delete">
       <svg class="context-menu__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="3 6 5 6 21 6"/>
@@ -382,8 +394,26 @@
     </div>
   </div>
 
+  <!-- ───────── Single Account QR Modal ───────── -->
+  <div id="qr-modal" class="qr-modal qr-modal--hidden">
+    <div class="qr-modal__card">
+      <div class="qr-modal__header">
+        <h3 class="qr-modal__title" id="qr-modal-title">Service Name</h3>
+        <button id="btn-qr-modal-close" class="qr-modal__close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div id="qr-modal-code" class="qr-modal__code-container"></div>
+      <div class="qr-modal__hint" data-i18n="qr_modal_hint">Scan with your phone's camera to import into an authenticator app</div>
+    </div>
+  </div>
+
   <!-- Third party libraries (loaded globally before type="module" scripts) -->
   <script src="jsQR.js"></script>
+  <script src="qrcode.min.js"></script>
   
   <!-- Main application script loaded as ES Module -->
   <script type="module" src="popup.js"></script>

@@ -73,8 +73,15 @@ const $contextMenu = document.getElementById("context-menu");
 const $ctxCopy     = document.getElementById("ctx-copy");
 const $ctxEdit     = document.getElementById("ctx-edit");
 const $ctxMove     = document.getElementById("ctx-move");
+const $ctxQr       = document.getElementById("ctx-qr");
 const $ctxDelete   = document.getElementById("ctx-delete");
 let activeCardId   = null;
+
+// QR Modal references
+const $qrModal          = document.getElementById("qr-modal");
+const $qrModalTitle     = document.getElementById("qr-modal-title");
+const $qrModalCode      = document.getElementById("qr-modal-code");
+const $btnQrModalClose  = document.getElementById("btn-qr-modal-close");
 
 // Settings panel references
 const $toggleSettings = document.getElementById("btn-toggle-settings");
@@ -710,6 +717,74 @@ $ctxDelete.addEventListener("click", (e) => {
     }, { once: true });
   }
   $contextMenu.classList.add("context-menu--hidden");
+});
+
+// Show QR from Context Menu
+$ctxQr.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  $contextMenu.classList.add("context-menu--hidden");
+  if (!activeCardId) return;
+
+  const accounts = await loadAccounts();
+  const acc = accounts.find(a => a.id === activeCardId);
+  if (acc) {
+    try {
+      const plainSecret = await decryptSecret(acc.secret);
+      const type = acc.type || "totp";
+      const service = acc.service || "Service";
+      const login = acc.login || "user";
+      const period = acc.period || 30;
+      const digits = acc.digits || 6;
+      const algorithm = acc.algorithm || "SHA-1";
+      const counter = acc.counter || 0;
+
+      // Construct standard otpauth:// URL
+      let otpauthUrl = `otpauth://${type}/${encodeURIComponent(service)}:${encodeURIComponent(login)}?secret=${plainSecret}&issuer=${encodeURIComponent(service)}`;
+      if (type === "totp") {
+        otpauthUrl += `&period=${period}`;
+      } else {
+        otpauthUrl += `&counter=${counter}`;
+      }
+      if (digits !== 6) {
+        otpauthUrl += `&digits=${digits}`;
+      }
+      if (algorithm !== "SHA-1") {
+        otpauthUrl += `&algorithm=${algorithm}`;
+      }
+
+      // Populate Title
+      $qrModalTitle.textContent = `${service} (${login})`;
+
+      // Render QR code
+      $qrModalCode.innerHTML = "";
+      new QRCode($qrModalCode, {
+        text: otpauthUrl,
+        width: 160,
+        height: 160,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+
+      // Show modal
+      $qrModal.classList.remove("qr-modal--hidden");
+    } catch (err) {
+      console.error(err);
+      showToast("toast_save_error", "error");
+    }
+  }
+});
+
+// Close QR Modal
+$btnQrModalClose.addEventListener("click", () => {
+  $qrModal.classList.add("qr-modal--hidden");
+});
+
+$qrModal.addEventListener("click", (e) => {
+  if (e.target === $qrModal) {
+    $qrModal.classList.add("qr-modal--hidden");
+  }
 });
 
 /* ================================================================
