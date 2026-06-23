@@ -832,12 +832,21 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  padding: 8px 14px;
+  padding: 8px 26px 8px 12px;
   font-family: inherit;
   font-size: 13px;
   outline: none;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  
+  /* Custom chevron dropdown arrow */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23e8ecf4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 11px;
 }
 .settings-select:focus {
   border-color: var(--accent);
@@ -1176,6 +1185,9 @@ body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10
 }
 .theme-light .settings-checkbox {
   background: var(--bg-input);
+}
+.theme-light .settings-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23111827' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 }
 .theme-light .numpad-btn {
   background: #ffffff;
