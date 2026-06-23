@@ -30,6 +30,7 @@ const $inputBackupFile       = document.getElementById("input-backup-file");
 const $lockScreen            = document.getElementById("lock-screen");
 const $pinSetupOverlay       = document.getElementById("pin-setup-overlay");
 const $btnPinSetupCancel     = document.getElementById("btn-pin-setup-cancel");
+const $btnSettingsBack       = document.getElementById("btn-settings-back");
 
 /* ================================================================
    Local State variables for PIN Keypads
@@ -365,4 +366,10 @@ export function initSettingsController() {
     $pinSetupOverlay.classList.add("lock-screen--hidden");
     resetSetupOverlay();
   });
+
+  if ($btnSettingsBack) {
+    $btnSettingsBack.addEventListener("click", () => {
+      closeAllPanels();
+    });
+  }
 }
