@@ -52,10 +52,37 @@ body {
   color: var(--text-primary);
   background: var(--bg-base);
   scrollbar-width: thin;
-  scrollbar-color: var(--text-muted) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
-body::-webkit-scrollbar { width: 5px; }
-body::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 10px; }
+
+/* ---------- Custom Scrollbars (Global Webkit) ---------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  border: 2px solid var(--bg-base);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Light Theme Scrollbar Overrides */
+.theme-light ::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border: 2px solid var(--bg-base);
+}
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
 
 /* ---------- Header ---------- */
 .header {
