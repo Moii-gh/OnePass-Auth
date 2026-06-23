@@ -105,7 +105,7 @@ const $btnCancelNewCatInline = document.getElementById("btn-cancel-new-cat-inlin
 
 let currentCategory = "all";
 
-const DEFAULT_CATEGORIES = ["personal", "work", "finance", "social", "other"];
+const DEFAULT_CATEGORIES = [];
 
 // Lock screen overlays
 const $lockScreen = document.getElementById("lock-screen");
