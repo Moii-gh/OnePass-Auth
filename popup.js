@@ -79,6 +79,7 @@ let activeCardId   = null;
 // Settings panel references
 const $toggleSettings = document.getElementById("btn-toggle-settings");
 const $settingsPanel  = document.getElementById("settings-panel");
+const $btnSettingsBack = document.getElementById("btn-settings-back");
 const $colorDots      = document.querySelectorAll(".color-dot");
 const $settingThemeMode = document.getElementById("setting-theme-mode");
 const $settingLanguage = document.getElementById("setting-language");
@@ -195,6 +196,8 @@ function closeAllPanels() {
     $newCatInlineContainer.style.display = "none";
   }
   resetQrPreview();
+  
+  document.body.classList.remove("settings-active");
 }
 
 $toggleForm.addEventListener("click", () => {
@@ -228,7 +231,12 @@ $toggleSettings.addEventListener("click", () => {
     settingsOpen = true;
     $settingsPanel.classList.remove("settings-panel--hidden");
     $toggleSettings.classList.add("header__btn--active");
+    document.body.classList.add("settings-active");
   }
+});
+
+$btnSettingsBack.addEventListener("click", () => {
+  closeAllPanels();
 });
 
 /* ================================================================
