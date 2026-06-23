@@ -25,6 +25,7 @@ yarn-error.log*
 *.pem
 
 # Python cache (for generate_logo.py)
+generate_logo.py
 __pycache__/
 *.pyc
 *.pyo
