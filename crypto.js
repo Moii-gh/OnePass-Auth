@@ -13,16 +13,32 @@ let inMemoryKey = null;
  */
 export function clearInMemoryKey() {
   inMemoryKey = null;
+  chrome.storage.session.remove("__session_enc_key");
 }
 
 /**
  * Check if the key is locked
  */
 export async function isLocked() {
+  if (inMemoryKey) return false;
+
+  // Check if session storage has the unlocked key
+  const sessionData = await new Promise((resolve) =>
+    chrome.storage.session.get("__session_enc_key", resolve)
+  );
+  if (sessionData && sessionData["__session_enc_key"]) {
+    const rawBytes = new Uint8Array(sessionData["__session_enc_key"]);
+    inMemoryKey = await crypto.subtle.importKey("raw", rawBytes, "AES-GCM", true, [
+      "encrypt",
+      "decrypt",
+    ]);
+    return false;
+  }
+
   const storedData = await new Promise((resolve) =>
     chrome.storage.local.get("__enc_key_locked", resolve)
   );
-  return !!storedData["__enc_key_locked"] && !inMemoryKey;
+  return !!storedData["__enc_key_locked"];
 }
 
 /**
@@ -63,6 +79,12 @@ export async function unlockKey(pin) {
     "encrypt",
     "decrypt",
   ]);
+
+  // Save the master key to session storage to persist across contexts/popups
+  await new Promise((resolve) =>
+    chrome.storage.session.set({ __session_enc_key: Array.from(rawBytes) }, resolve)
+  );
+
   return true;
 }
 
@@ -100,6 +122,11 @@ export async function setupPin(pin) {
   );
 
   inMemoryKey = key;
+
+  // Save the master key to session storage to persist across contexts/popups
+  await new Promise((resolve) =>
+    chrome.storage.session.set({ __session_enc_key: Array.from(rawBytes) }, resolve)
+  );
 }
 
 /**
@@ -119,6 +146,11 @@ export async function removePin(pin) {
 
   await new Promise((resolve) =>
     chrome.storage.local.remove(["__enc_key_locked", "__enc_key_salt", "__enc_key_iv"], resolve)
+  );
+
+  // Clear session storage as it is no longer locked
+  await new Promise((resolve) =>
+    chrome.storage.session.remove("__session_enc_key", resolve)
   );
 }
 
@@ -153,6 +185,19 @@ async function deriveKeyFromPin(pin, saltBytes) {
  */
 export async function getEncryptionKey() {
   if (inMemoryKey) {
+    return inMemoryKey;
+  }
+
+  // Try checking session storage first
+  const sessionData = await new Promise((resolve) =>
+    chrome.storage.session.get("__session_enc_key", resolve)
+  );
+  if (sessionData && sessionData["__session_enc_key"]) {
+    const rawBytes = new Uint8Array(sessionData["__session_enc_key"]);
+    inMemoryKey = await crypto.subtle.importKey("raw", rawBytes, "AES-GCM", true, [
+      "encrypt",
+      "decrypt",
+    ]);
     return inMemoryKey;
   }
 

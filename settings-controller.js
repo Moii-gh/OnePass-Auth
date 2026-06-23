@@ -47,29 +47,30 @@ const SETTINGS_KEY = "app_settings";
    ================================================================ */
 export async function loadAppSettings() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(SETTINGS_KEY, (syncResult) => {
-      const syncSaved = syncResult[SETTINGS_KEY];
-      if (syncSaved) {
+    chrome.storage.local.get(SETTINGS_KEY, (localResult) => {
+      const localSaved = localResult[SETTINGS_KEY];
+      if (localSaved) {
         state.appSettings = {
-          accentColor: syncSaved.accentColor || "white",
-          themeMode: syncSaved.themeMode || "dark",
-          language: syncSaved.language || "auto",
-          privacyMode: syncSaved.privacyMode !== undefined ? syncSaved.privacyMode : false,
-          clearClipboardSec: syncSaved.clearClipboardSec !== undefined ? parseInt(syncSaved.clearClipboardSec, 10) : 30
+          accentColor: localSaved.accentColor || "white",
+          themeMode: localSaved.themeMode || "dark",
+          language: localSaved.language || "auto",
+          privacyMode: localSaved.privacyMode !== undefined ? localSaved.privacyMode : false,
+          clearClipboardSec: localSaved.clearClipboardSec !== undefined ? parseInt(localSaved.clearClipboardSec, 10) : 30
         };
         resolve(state.appSettings);
       } else {
-        chrome.storage.local.get(SETTINGS_KEY, async (localResult) => {
-          const localSaved = localResult[SETTINGS_KEY] || {};
+        // Migrate from sync storage
+        chrome.storage.sync.get(SETTINGS_KEY, async (syncResult) => {
+          const syncSaved = syncResult[SETTINGS_KEY] || {};
           state.appSettings = {
-            accentColor: localSaved.accentColor || "white",
-            themeMode: localSaved.themeMode || "dark",
-            language: localSaved.language || "auto",
-            privacyMode: localSaved.privacyMode !== undefined ? localSaved.privacyMode : false,
-            clearClipboardSec: localSaved.clearClipboardSec !== undefined ? parseInt(localSaved.clearClipboardSec, 10) : 30
+            accentColor: syncSaved.accentColor || "white",
+            themeMode: syncSaved.themeMode || "dark",
+            language: syncSaved.language || "auto",
+            privacyMode: syncSaved.privacyMode !== undefined ? syncSaved.privacyMode : false,
+            clearClipboardSec: syncSaved.clearClipboardSec !== undefined ? parseInt(syncSaved.clearClipboardSec, 10) : 30
           };
           await saveAppSettings();
-          chrome.storage.local.remove(SETTINGS_KEY);
+          chrome.storage.sync.remove(SETTINGS_KEY);
           resolve(state.appSettings);
         });
       }
@@ -79,7 +80,7 @@ export async function loadAppSettings() {
 
 export async function saveAppSettings() {
   return new Promise((resolve) => {
-    chrome.storage.sync.set({ [SETTINGS_KEY]: state.appSettings }, resolve);
+    chrome.storage.local.set({ [SETTINGS_KEY]: state.appSettings }, resolve);
   });
 }
 

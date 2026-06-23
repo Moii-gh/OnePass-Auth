@@ -119,19 +119,21 @@ $canvas.addEventListener("mousedown", (e) => {
   }
 });
 
-$canvas.addEventListener("mousemove", (e) => {
+window.addEventListener("mousemove", (e) => {
   if (isDrawing) {
-    endX = e.clientX;
-    endY = e.clientY;
+    // Clamp selection coordinates to window boundaries
+    endX = Math.max(0, Math.min(e.clientX, canvasWidth));
+    endY = Math.max(0, Math.min(e.clientY, canvasHeight));
     drawScene();
   }
 });
 
-$canvas.addEventListener("mouseup", async (e) => {
+window.addEventListener("mouseup", async (e) => {
   if (isDrawing) {
     isDrawing = false;
-    endX = e.clientX;
-    endY = e.clientY;
+    // Clamp coordinates on mouse up
+    endX = Math.max(0, Math.min(e.clientX, canvasWidth));
+    endY = Math.max(0, Math.min(e.clientY, canvasHeight));
 
     const x = Math.min(startX, endX);
     const y = Math.min(startY, endY);
@@ -153,12 +155,6 @@ $canvas.addEventListener("mouseup", async (e) => {
 
 // Process cropped region to scan QR
 async function processCrop(x, y, w, h) {
-  // Use temporary off-screen canvas to get cropped image data
-  const cropCanvas = document.createElement("canvas");
-  cropCanvas.width = w;
-  cropCanvas.height = h;
-  const cropCtx = cropCanvas.getContext("2d");
-
   // Calculate coordinates relative to actual screenshot resolution
   const scaleX = img.naturalWidth / canvasWidth;
   const scaleY = img.naturalHeight / canvasHeight;
@@ -168,13 +164,22 @@ async function processCrop(x, y, w, h) {
   const sourceW = w * scaleX;
   const sourceH = h * scaleY;
 
+  // Use temporary off-screen canvas to get cropped image data at native physical resolution (prevents scaling blur)
+  const cropCanvas = document.createElement("canvas");
+  cropCanvas.width = sourceW;
+  cropCanvas.height = sourceH;
+  const cropCtx = cropCanvas.getContext("2d");
+  
+  // Disable image smoothing to ensure sharp QR pixels
+  cropCtx.imageSmoothingEnabled = false;
+
   cropCtx.drawImage(
     img,
     sourceX, sourceY, sourceW, sourceH, // source rect
-    0, 0, w, h                          // dest rect
+    0, 0, sourceW, sourceH              // dest rect
   );
 
-  const imageData = cropCtx.getImageData(0, 0, w, h);
+  const imageData = cropCtx.getImageData(0, 0, sourceW, sourceH);
   const code = jsQR(imageData.data, imageData.width, imageData.height);
 
   if (!code) {
@@ -243,6 +248,7 @@ async function processCrop(x, y, w, h) {
 // UI controls
 $btnStart.addEventListener("click", () => {
   $instructionOverlay.style.opacity = "0";
+  $instructionOverlay.style.pointerEvents = "none"; // Stop intercepting mouse events immediately
   setTimeout(() => {
     $instructionOverlay.style.display = "none";
   }, 500);

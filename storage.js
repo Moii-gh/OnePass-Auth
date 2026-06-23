@@ -11,23 +11,23 @@ const ACCOUNTS_KEY = "accounts";
  */
 export async function loadAccounts() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(ACCOUNTS_KEY, async (syncResult) => {
-      const syncAccounts = syncResult[ACCOUNTS_KEY];
+    chrome.storage.local.get(ACCOUNTS_KEY, async (localResult) => {
+      const localAccounts = localResult[ACCOUNTS_KEY];
       
-      if (syncAccounts) {
-        resolve(syncAccounts);
+      if (localAccounts) {
+        resolve(localAccounts);
       } else {
-        // Checking local storage for migration if sync storage is empty
-        chrome.storage.local.get(ACCOUNTS_KEY, async (localResult) => {
-          const localAccounts = localResult[ACCOUNTS_KEY] || [];
-          if (localAccounts.length > 0) {
-            // Save to sync storage
-            await saveAccounts(localAccounts);
-            // Clear local storage for clean state
-            chrome.storage.local.remove(ACCOUNTS_KEY);
-            console.log("Accounts migrated from local storage to sync storage.");
+        // Fallback: check sync storage for migration if local storage is empty
+        chrome.storage.sync.get(ACCOUNTS_KEY, async (syncResult) => {
+          const syncAccounts = syncResult[ACCOUNTS_KEY] || [];
+          if (syncAccounts.length > 0) {
+            // Save to local storage
+            await saveAccounts(syncAccounts);
+            // Clear sync storage to avoid duplication/confusion
+            chrome.storage.sync.remove(ACCOUNTS_KEY);
+            console.log("Accounts migrated from sync storage to local storage.");
           }
-          resolve(localAccounts);
+          resolve(syncAccounts);
         });
       }
     });
@@ -35,11 +35,11 @@ export async function loadAccounts() {
 }
 
 /**
- * Save full accounts array to sync storage.
+ * Save full accounts array to local storage.
  */
 export async function saveAccounts(accounts) {
   return new Promise((resolve) =>
-    chrome.storage.sync.set({ [ACCOUNTS_KEY]: accounts }, resolve)
+    chrome.storage.local.set({ [ACCOUNTS_KEY]: accounts }, resolve)
   );
 }
 
@@ -121,8 +121,21 @@ const CATEGORIES_KEY = "custom_categories";
  */
 export async function loadCustomCategories() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(CATEGORIES_KEY, (result) => {
-      resolve(result[CATEGORIES_KEY] || []);
+    chrome.storage.local.get(CATEGORIES_KEY, (localResult) => {
+      const localCats = localResult[CATEGORIES_KEY];
+      if (localCats) {
+        resolve(localCats);
+      } else {
+        // Migrate from sync
+        chrome.storage.sync.get(CATEGORIES_KEY, (syncResult) => {
+          const syncCats = syncResult[CATEGORIES_KEY] || [];
+          if (syncCats.length > 0) {
+            chrome.storage.local.set({ [CATEGORIES_KEY]: syncCats });
+            chrome.storage.sync.remove(CATEGORIES_KEY);
+          }
+          resolve(syncCats);
+        });
+      }
     });
   });
 }
@@ -131,9 +144,9 @@ export async function loadCustomCategories() {
  * Save custom categories.
  */
 export async function saveCustomCategories(categories) {
-  return new Promise((resolve) => {
-    chrome.storage.sync.set({ [CATEGORIES_KEY]: categories }, resolve);
-  });
+  return new Promise((resolve) =>
+    chrome.storage.local.set({ [CATEGORIES_KEY]: categories }, resolve)
+  );
 }
 
 /**
